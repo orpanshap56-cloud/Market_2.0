@@ -137,6 +137,23 @@ if st.session_state.page == "main":
         display_name = f"🎁 **{row['title']}** ({price} 🪙)"
         if is_my_item: display_name += " *(Ваше)*"
         c1.write(display_name)
+
+    # --- ДОБАВЛЕНИЕ ЛОТА ---
+    with st.expander("🏷️ Выставить лот на продажу"):
+        with st.form("new_market_form", clear_on_submit=True):
+            m_title = st.text_input("Что продаем?")
+            m_price = st.number_input("Цена (🪙)", min_value=1, value=50)
+            m_seller = st.selectbox("Продавец", ["Муж", "Жена", "Оба"], index=0 if current_user=="Муж" else 1)
+            
+            if st.form_submit_button("Выставить на маркет"):
+                if m_title:
+                    new_item = {"title": m_title, "price": m_price, "seller": m_seller}
+                    db["market"] = pd.concat([db["market"], pd.DataFrame([new_item])], ignore_index=True)
+                    save_data("market", db["market"])
+                    st.success("Лот добавлен на витрину!")
+                    st.rerun()
+                else:
+                    st.warning("Введи название лота!")
         
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
