@@ -54,10 +54,10 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 
 # --- САЙДБАР ---
-with st.sidebar:
+ with st.sidebar:
    # Было: st.title(f"{current_user}")
 # Стало:
-with st.sidebar:
+ with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
     # ... дальше метрики баланса
     st.metric("Кошелек", f"{my_balance} 🪙")
