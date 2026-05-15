@@ -45,9 +45,6 @@ if st.session_state.user is None:
 current_user = st.session_state.user
 partner = "Жена" if current_user == "Муж" else "Муж"
 
-my_balance = int(db["balances"].loc[0, current_user])
-my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
-
 db = st.session_state.db
 current_user = st.session_state.user
 my_balance = int(db["balances"].loc[0, current_user])
@@ -55,11 +52,7 @@ my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 
 # --- САЙДБАР ---
 with st.sidebar:
-   # Было: st.title(f"{current_user}")
-# Стало:
- with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
-    # ... дальше метрики баланса
     st.metric("Кошелек", f"{my_balance} 🪙")
     st.metric("Рейтинг", f"{my_rating} 💖")
     if st.button("🔄 Синхронизировать", use_container_width=True): sync_database(); st.rerun()
@@ -176,7 +169,7 @@ if st.session_state.page == "main":
         with st.form("new_market_form", clear_on_submit=True):
             m_title = st.text_input("Что продаем?")
             m_price = st.number_input("Цена (🪙)", min_value=1, value=50)
-            m_seller = st.selectbox("Продавец", ["Муж", "Жена", "Оба"], index=0 if current_user=="Муж" else 1)
+            m_seller = st.selectbox("Продавец", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x), index=0 if current_user=="Муж" else 1)
             
             if st.form_submit_button("Выставить на маркет"):
                 if m_title:
