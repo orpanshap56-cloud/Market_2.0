@@ -92,23 +92,44 @@ if st.session_state.page == "main":
     # МАРКЕТПЛЕЙС
     st.header("🛒 Маркет")
     for j, row in df_market.iterrows():
-        if row['seller'] != current_user:
-            c1, c2 = st.columns([3, 1])
-            price = int(row['price'])
-            if c2.button("Купить", key=f"m_{j}", disabled=my_balance < price):
-                if current_user == "Муж":
-                    df_balances.loc[0, "Муж"] -= price
-                    if row['seller'] == "Жена": df_balances.loc[0, "Жена"] += price
-                else:
-                    df_balances.loc[0, "Жена"] -= price
-                    if row['seller'] == "Муж": df_balances.loc[0, "Муж"] += price
-                
-                # Пишем в историю
-                new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
-                save_data("history", pd.concat([df_history, new_log]))
-                save_data("balances", df_balances)
-                st.balloons(); st.rerun()
-            c1.write(f"🎁 **{row['title']}** ({price} 🪙)")
+        c1, c2 = st.columns([3, 1])
+        price = int(row['price'])
+        
+        # Проверяем, твой ли это лот
+        is_my_item = (row['seller'] == current_user)
+        # Кнопка активна, если это не твой лот И хватает денег
+        can_buy = (not is_my_item) and (my_balance >= price)
+        
+        # Меняем текст на кнопке для наглядности
+        btn_label = "Мой лот" if is_my_item else "Купить"
+        
+        if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
+            # Логика покупки остается прежней
+            if current_user == "Муж":
+                df_balances.loc[0, "Муж"] -= price
+                if row['seller'] == "Жена": df_balances.loc[0, "Жена"] += price
+            else:
+                df_balances.loc[0, "Жена"] -= price
+                if row['seller'] == "Муж": df_balances.loc[0, "Муж"] += price
+            
+            # Пишем в историю
+            new_log = pd.DataFrame([{
+                "buyer": current_user, 
+                "item": row['title'], 
+                "price": price, 
+                "seller": row['seller'], 
+                "type": "Покупка"
+            }])
+            save_data("history", pd.concat([df_history, new_log]))
+            save_data("balances", df_balances)
+            st.balloons()
+            st.rerun()
+            
+        # Выводим название и цену. Если лот твой — пометим его
+        display_name = f"🎁 **{row['title']}** ({price} 🪙)"
+        if is_my_item:
+            display_name += " *(Ваше предложение)*"
+        c1.write(display_name)
 
     # ФОРМЫ ДОБАВЛЕНИЯ (в экспандерах)
     with st.expander("➕ Добавить задачу/лот"):
