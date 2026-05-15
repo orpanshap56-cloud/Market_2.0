@@ -55,19 +55,21 @@ with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
     st.metric("Кошелек", f"{my_balance} 🪙")
     st.metric("Рейтинг", f"{my_rating} 💖")
+    
+    st.markdown("---")
     if st.button("🔄 Синхронизировать", use_container_width=True): sync_database(); st.rerun()
-    if st.button("🏠 Главная"): st.session_state.page = "main"; st.rerun()
-    if st.button("👤 Кабинет"): st.session_state.page = "profile"; st.rerun()
-    with st.expander("⚙️ Настройки профиля"):
-        new_name = st.text_input("Мой никнейм", value=DISPLAY[current_user])
-        if st.button("Сохранить"):
-            col_name = f"{current_user}_Имя"
-            # Если колонки вдруг не было, pandas её создаст
-            db["balances"].loc[0, col_name] = new_name
-            save_data("balances", db["balances"])
-            st.success("Ник обновлен! Сейчас страница перезагрузится...")
-            sync_database() # Принудительно качаем свежие данные
-            st.rerun()
+    
+    # НОВЫЕ КНОПКИ НАВИГАЦИИ
+    if st.button("📋 Список задач", use_container_width=True):
+        st.session_state.page = "tasks"; st.rerun()
+    if st.button("🛒 Маркетплейс", use_container_width=True):
+        st.session_state.page = "market"; st.rerun()
+    if st.button("👤 Личный кабинет", use_container_width=True):
+        st.session_state.page = "profile"; st.rerun()
+        
+    st.markdown("---")
+    if st.button("🚪 Выйти", use_container_width=True):
+        st.session_state.user = None; st.rerun()
 
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА
@@ -153,9 +155,14 @@ if st.session_state.page == "main":
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                 save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                 st.rerun()
-                
-    # --- МАРКЕТПЛЕЙС ---
-    st.header("🛒 Маркет")
+
+
+# ==========================================
+# ЭКРАН: МАРКЕТПЛЕЙС
+# ==========================================
+elif st.session_state.page == "market":
+    st.title("🛒 Маркетплейс")
+    
     for j, row in db["market"].iterrows():
         # Те же три колонки: описание, кнопка покупки и корзина
         c1, c2, c3 = st.columns([3, 1, 0.5])
@@ -194,7 +201,8 @@ if st.session_state.page == "main":
         if is_my_item: 
             display_name += " *(Ваше)*"
         c1.write(display_name)
-    # --- ДОБАВЛЕНИЕ ЛОТА ---
+    
+  # --- ДОБАВЛЕНИЕ ЛОТА ---
     with st.expander("🏷️ Выставить лот на продажу"):
         with st.form("new_market_form", clear_on_submit=True):
             m_title = st.text_input("Что продаем?")
@@ -210,6 +218,11 @@ if st.session_state.page == "main":
                     st.rerun()
                 else:
                     st.warning("Введи название лота!")
+    
+    # --- МАРКЕТПЛЕЙС ---
+    st.header("🛒 Маркет")
+    
+    
         
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
