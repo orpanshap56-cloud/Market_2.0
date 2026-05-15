@@ -22,12 +22,31 @@ if "db" not in st.session_state: sync_database()
 if "user" not in st.session_state: st.session_state.user = None
 if "page" not in st.session_state: st.session_state.page = "main"
 
+# --- ПОДГОТОВКА ДАННЫХ ИЗ КЭША ---
+if "db" not in st.session_state: sync_database()
+db = st.session_state.db 
+
+# Аккуратно читаем ники (чтобы код не упал, если колонок вдруг нет)
+h_name = db["balances"].loc[0, "Муж_Имя"] if "Муж_Имя" in db["balances"].columns else "Муж"
+w_name = db["balances"].loc[0, "Жена_Имя"] if "Жена_Имя" in db["balances"].columns else "Жена"
+
+# Словарь для перевода системной роли в красивый ник
+DISPLAY = {"Муж": h_name, "Жена": w_name, "Оба": "Оба"}
+
+# --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
+if "user" not in st.session_state: st.session_state.user = None
 if st.session_state.user is None:
     st.title("Кто сегодня молодец? 😎")
     c1, c2 = st.columns(2)
-    if c1.button("Я Муж", use_container_width=True): st.session_state.user = "Муж"; st.rerun()
-    if c2.button("Я Жена", use_container_width=True): st.session_state.user = "Жена"; st.rerun()
+    if c1.button(f"Я {DISPLAY['Муж']}", use_container_width=True): st.session_state.user = "Муж"; st.rerun()
+    if c2.button(f"Я {DISPLAY['Жена']}", use_container_width=True): st.session_state.user = "Жена"; st.rerun()
     st.stop()
+
+current_user = st.session_state.user
+partner = "Жена" if current_user == "Муж" else "Муж"
+
+my_balance = int(db["balances"].loc[0, current_user])
+my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 
 db = st.session_state.db
 current_user = st.session_state.user
