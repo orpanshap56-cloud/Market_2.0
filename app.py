@@ -114,24 +114,34 @@ if st.session_state.page == "main":
 
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
-        with st.form("new_task_form", clear_on_submit=True):
-            title = st.text_input("Что сделать?")
-            reward = st.number_input("Награда", min_value=1, value=10)
-            assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"])
-            t_type = st.radio("Режим", ["Разовая", "Интервальная"])
-            
+        # Убрали st.form, теперь интерфейс реагирует на каждый клик мгновенно
+        title = st.text_input("Что сделать?")
+        reward = st.number_input("Награда", min_value=1, value=10)
+        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"])
+        t_type = st.radio("Режим", ["Разовая", "Интервальная"])
+        
+        # Задаем пустые значения по умолчанию
+        val = 0
+        unit = ""
+        
+        # Магия тут: показываем настройки интервала ТОЛЬКО если тумблер на "Интервальная"
+        if t_type == "Интервальная":
             c_val, c_unit = st.columns(2)
             val = c_val.number_input("Интервал", min_value=1, value=12)
             unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
             
-            if st.form_submit_button("Создать"):
+        if st.button("Создать"):
+            if not title:
+                st.warning("Напиши название задачи!")
+            else:
                 new_data = {
                     "title": title, "reward": reward, "assigned_to": assignee,
                     "task_type": t_type, 
-                    "interval_value": val if t_type == "Интервальная" else 0,
-                    "interval_unit": unit if t_type == "Интервальная" else "",
+                    "interval_value": val,
+                    "interval_unit": unit,
                     "last_completed": ""
                 }
                 db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_data])], ignore_index=True)
                 save_data("tasks", db["tasks"])
+                st.success("Задача добавлена!")
                 st.rerun()
