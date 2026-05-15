@@ -65,7 +65,7 @@ with st.sidebar:
     if st.button("🔄 Синхронизировать", use_container_width=True): sync_database(); st.rerun()
     if st.button("🏠 Главная"): st.session_state.page = "main"; st.rerun()
     if st.button("👤 Кабинет"): st.session_state.page = "profile"; st.rerun()
-        with st.expander("⚙️ Настройки профиля"):
+    with st.expander("⚙️ Настройки профиля"):
         new_name = st.text_input("Мой никнейм", value=DISPLAY[current_user])
         if st.button("Сохранить"):
             col_name = f"{current_user}_Имя"
