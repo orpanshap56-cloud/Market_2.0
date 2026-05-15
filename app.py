@@ -243,7 +243,7 @@ if st.session_state.page == "main":
                     "last_completed": "",
                     "created_by": current_user  # Должно быть именно так
                 }
-                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_data])], ignore_index=True)
+                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
                 save_data("tasks", db["tasks"])
                 st.success("Задача добавлена!")
                 st.rerun()
