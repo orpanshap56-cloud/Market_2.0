@@ -80,10 +80,14 @@ if st.session_state.page == "main":
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
         
-        ### НОВОЕ: Готовим подписи имен
-        creator = row.get('created_by', 'Система')
+        # --- ИСПРАВЛЕННЫЙ БЛОК ИМЕН ---
+        raw_creator = row.get('created_by')
+        # Если в ячейке пусто (NaN), пишем "Система", иначе берем имя
+        creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
+        
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
+        # ------------------------------
         
         # Делаем три колонки: текст, кнопка "Готово" и корзина
         c1, c2, c3 = st.columns([3, 1, 0.5])
@@ -229,12 +233,15 @@ if st.session_state.page == "main":
             if not title:
                 st.warning("Напиши название задачи!")
             else:
-                new_data = {
-                    "title": title, "reward": reward, "assigned_to": assignee,
+                new_task = {
+                    "title": title, 
+                    "reward": reward, 
+                    "assigned_to": assignee, 
                     "task_type": t_type, 
-                    "interval_value": val,
-                    "interval_unit": unit,
-                    "last_completed": ""
+                    "interval_value": val, 
+                    "interval_unit": unit, 
+                    "last_completed": "",
+                    "created_by": current_user  # Должно быть именно так
                 }
                 db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_data])], ignore_index=True)
                 save_data("tasks", db["tasks"])
