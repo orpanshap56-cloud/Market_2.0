@@ -82,6 +82,7 @@ if st.session_state.page == "main":
                         hours, remainder = divmod(diff.seconds, 3600)
                         minutes, _ = divmod(remainder, 60)
                         time_text = f"⏳ Доступно через {hours}ч {minutes}м"
+
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
@@ -112,6 +113,31 @@ if st.session_state.page == "main":
                 save_data("history", db["history"])
                 st.rerun()
 
+    # --- МАРКЕТПЛЕЙС ---
+    st.header("🛒 Маркет")
+    for j, row in db["market"].iterrows():
+        c1, c2 = st.columns([3, 1])
+        price = int(row['price'])
+        is_my_item = (row['seller'] == current_user)
+        can_buy = (not is_my_item) and (my_balance >= price)
+        btn_label = "Мой лот" if is_my_item else "Купить"
+        
+        if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
+            # Снимаем 🪙, начисляем 💖 партнеру
+            db["balances"].loc[0, current_user] -= price
+            if row['seller'] != "Оба":
+                partner_key = f"{row['seller']}_Рейтинг"
+                db["balances"].loc[0, partner_key] += price
+            
+            new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
+            db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+            save_data("balances", db["balances"]); save_data("history", db["history"])
+            st.balloons(); st.rerun()
+            
+        display_name = f"🎁 **{row['title']}** ({price} 🪙)"
+        if is_my_item: display_name += " *(Ваше)*"
+        c1.write(display_name)
+        
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
         # Убрали st.form, теперь интерфейс реагирует на каждый клик мгновенно
