@@ -140,12 +140,21 @@ if st.session_state.page == "main":
                 
     # --- МАРКЕТПЛЕЙС ---
     st.header("🛒 Маркет")
+    # --- МАРКЕТПЛЕЙС ---
+    st.header("🛒 Маркет")
     for j, row in db["market"].iterrows():
-        c1, c2 = st.columns([3, 1])
+        # Те же три колонки: описание, кнопка покупки и корзина
+        c1, c2, c3 = st.columns([3, 1, 0.5])
         price = int(row['price'])
         is_my_item = (row['seller'] == current_user)
         can_buy = (not is_my_item) and (my_balance >= price)
         btn_label = "Мой лот" if is_my_item else "Купить"
+        
+        # Кнопка удаления лота (🗑️)
+        if c3.button("🗑️", key=f"del_m_{j}", help="Удалить лот с витрины"):
+            db["market"] = db["market"].drop(j)
+            save_data("market", db["market"])
+            st.rerun()
         
         if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
             # Снимаем 🪙, начисляем 💖 партнеру
@@ -154,15 +163,23 @@ if st.session_state.page == "main":
                 partner_key = f"{row['seller']}_Рейтинг"
                 db["balances"].loc[0, partner_key] += price
             
-            new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
+            new_log = pd.DataFrame([{
+                "buyer": current_user, 
+                "item": row['title'], 
+                "price": price, 
+                "seller": row['seller'], 
+                "type": "Покупка"
+            }])
             db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-            save_data("balances", db["balances"]); save_data("history", db["history"])
-            st.balloons(); st.rerun()
+            save_data("balances", db["balances"])
+            save_data("history", db["history"])
+            st.balloons()
+            st.rerun()
             
         display_name = f"🎁 **{row['title']}** ({price} 🪙)"
-        if is_my_item: display_name += " *(Ваше)*"
+        if is_my_item: 
+            display_name += " *(Ваше)*"
         c1.write(display_name)
-
     # --- ДОБАВЛЕНИЕ ЛОТА ---
     with st.expander("🏷️ Выставить лот на продажу"):
         with st.form("new_market_form", clear_on_submit=True):
