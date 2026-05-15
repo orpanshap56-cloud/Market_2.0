@@ -74,7 +74,7 @@ with st.sidebar:
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА
 # ==========================================
-if st.session_state.page == "task":
+if st.session_state.page == "tasks":
     st.header("📋 Твои задачи")
     now = datetime.now()
 
