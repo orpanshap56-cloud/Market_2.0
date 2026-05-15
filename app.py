@@ -55,12 +55,26 @@ my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 
 # --- САЙДБАР ---
 with st.sidebar:
-    st.title(f"{current_user}")
+   # Было: st.title(f"{current_user}")
+# Стало:
+with st.sidebar:
+    st.title(f"{DISPLAY[current_user]}")
+    # ... дальше метрики баланса
     st.metric("Кошелек", f"{my_balance} 🪙")
     st.metric("Рейтинг", f"{my_rating} 💖")
     if st.button("🔄 Синхронизировать", use_container_width=True): sync_database(); st.rerun()
     if st.button("🏠 Главная"): st.session_state.page = "main"; st.rerun()
     if st.button("👤 Кабинет"): st.session_state.page = "profile"; st.rerun()
+        with st.expander("⚙️ Настройки профиля"):
+        new_name = st.text_input("Мой никнейм", value=DISPLAY[current_user])
+        if st.button("Сохранить"):
+            col_name = f"{current_user}_Имя"
+            # Если колонки вдруг не было, pandas её создаст
+            db["balances"].loc[0, col_name] = new_name
+            save_data("balances", db["balances"])
+            st.success("Ник обновлен! Сейчас страница перезагрузится...")
+            sync_database() # Принудительно качаем свежие данные
+            st.rerun()
 
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА
