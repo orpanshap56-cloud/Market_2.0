@@ -2,10 +2,8 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# 1. НАСТРОЙКИ СТРАНИЦЫ (всегда на самом верху)
 st.set_page_config(page_title="Семейная Монетизация", page_icon="💰", layout="centered")
 
-# 2. ПРОФИЛИ И СЕССИЯ
 PROFILES = {
     "Муж": {"avatar": "🧔‍♂️", "color": "blue"},
     "Жена": {"avatar": "👩‍🦰", "color": "pink"}
@@ -14,7 +12,7 @@ PROFILES = {
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# 3. ЭКРАН ВЫБОРА ПРОФИЛЯ
+# --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
 if st.session_state.user is None:
     st.title("Привет! Кто сегодня молодец? 😎")
     st.write("Выбери свой профиль:")
@@ -29,15 +27,14 @@ if st.session_state.user is None:
             st.session_state.user = "Жена"
             st.rerun()
             
-    st.stop() # Дальше код не идет, пока профиль не выбран
+    st.stop() 
 
 # ==========================================
-# 4. ОСНОВНОЙ ИНТЕРФЕЙС (ПРОФИЛЬ ВЫБРАН)
+# ОСНОВНОЙ ИНТЕРФЕЙС
 # ==========================================
 current_user = st.session_state.user
 partner = "Жена" if current_user == "Муж" else "Муж"
 
-# Коннект к базе Гугла
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data(sheet_name):
@@ -46,21 +43,21 @@ def get_data(sheet_name):
 def save_data(sheet_name, df):
     conn.update(worksheet=sheet_name, data=df)
 
-# Читаем данные из обеих вкладок
+# Читаем данные из всех трех вкладок
 try:
     df_balances = get_data("balances")
     df_tasks = get_data("tasks")
+    df_market = get_data("market") # Читаем маркет
     муж_баланс = int(df_balances.loc[0, "Муж"])
     жена_баланс = int(df_balances.loc[0, "Жена"])
 except Exception as e:
-    st.error("Ошибка загрузки данных! Проверь листы 'balances' и 'tasks' в Гугл Таблице.")
+    st.error("Ошибка загрузки данных! Проверь листы 'balances', 'tasks' и 'market' в Гугл Таблице.")
     st.stop()
 
-# Определяем, где чей баланс
 my_balance = муж_баланс if current_user == "Муж" else жена_баланс
 partner_balance = жена_баланс if current_user == "Муж" else муж_баланс
 
-# --- БОКОВАЯ ПАНЕЛЬ (ЛИЧНЫЙ КАБИНЕТ) ---
+# --- БОКОВАЯ ПАНЕЛЬ ---
 with st.sidebar:
     st.title(f"{PROFILES[current_user]['avatar']} Мой профиль")
     st.metric(label="Мой капитал", value=f"{my_balance} 🪙")
@@ -86,7 +83,6 @@ for i, row in df_tasks.iterrows():
     with col_task:
         st.write(f"**{row['title']}** — {row['reward']} 🪙 (Кому: {row['assigned_to']})")
     with col_btn:
-        # Проверяем, может ли текущий профиль выполнить задачу
         is_my_task = (row['assigned_to'] in [current_user, "Оба"])
         if st.button("Готово!", key=f"task_{i}", disabled=not is_my_task):
             if current_user == "Муж":
@@ -98,9 +94,6 @@ for i, row in df_tasks.iterrows():
             st.success("Монетки начислены!")
             st.rerun()
 
-st.markdown("---")
-
-# --- БЛОК СОЗДАНИЯ НОВЫХ ЗАДАЧ ---
 with st.expander("➕ Добавить новую задачу"):
     with st.form("new_task_form", clear_on_submit=True):
         new_title = st.text_input("Что нужно сделать?")
@@ -117,35 +110,45 @@ with st.expander("➕ Добавить новую задачу"):
 
 st.markdown("---")
 
-# --- МАРКЕТПЛЕЙС (пока зашит в код) ---
-MARKET = [
-    {"title": "Массаж спины", "price": 50, "seller": "Жена"},
-    {"title": "Приготовление ужина на заказ", "price": 40, "seller": "Муж"},
-    {"title": "Выходной от дел", "price": 100, "seller": "Оба"}
-]
-
+# --- МАРКЕТПЛЕЙС ---
 st.header("🛒 Маркетплейс")
 
-for j, item in enumerate(MARKET):
-    # Не показываем свои же товары для покупки (или показываем, если "Оба")
-    if item['seller'] != current_user:
+# Вывод товаров из таблицы
+for j, row in df_market.iterrows():
+    if row['seller'] != current_user:
         col_item, col_buy = st.columns([3, 1])
         with col_item:
-            st.write(f"🎁 **{item['title']}** — Цена: {item['price']} 🪙 (Продавец: {item['seller']})")
+            st.write(f"🎁 **{row['title']}** — Цена: {row['price']} 🪙 (Продавец: {row['seller']})")
         with col_buy:
-            can_afford = my_balance >= item['price']
+            item_price = int(row['price'])
+            can_afford = my_balance >= item_price
             
             if st.button("Купить", key=f"market_{j}", disabled=not can_afford):
                 if current_user == "Муж":
-                    df_balances.loc[0, "Муж"] = муж_баланс - item['price']
-                    if item['seller'] == "Жена":
-                        df_balances.loc[0, "Жена"] = жена_баланс + item['price']
+                    df_balances.loc[0, "Муж"] = муж_баланс - item_price
+                    if row['seller'] == "Жена":
+                        df_balances.loc[0, "Жена"] = жена_баланс + item_price
                 else:
-                    df_balances.loc[0, "Жена"] = жена_баланс - item['price']
-                    if item['seller'] == "Муж":
-                        df_balances.loc[0, "Муж"] = муж_баланс + item['price']
+                    df_balances.loc[0, "Жена"] = жена_баланс - item_price
+                    if row['seller'] == "Муж":
+                        df_balances.loc[0, "Муж"] = муж_баланс + item_price
                 
                 save_data("balances", df_balances)
                 st.balloons()
                 st.success("Куплено!")
                 st.rerun()
+
+# Добавление нового товара
+with st.expander("🏷️ Выставить лот на продажу"):
+    with st.form("new_market_form", clear_on_submit=True):
+        new_item_title = st.text_input("Что продаем?")
+        new_item_price = st.number_input("Цена (🪙)", min_value=1, value=50)
+        new_item_seller = st.selectbox("Кто продавец?", ["Муж", "Жена", "Оба"], index=0 if current_user == "Муж" else 1)
+        submit_item = st.form_submit_button("Выставить на маркет")
+        
+        if submit_item and new_item_title:
+            new_item_row = pd.DataFrame([{"title": new_item_title, "price": new_item_price, "seller": new_item_seller}])
+            df_market = pd.concat([df_market, new_item_row], ignore_index=True)
+            save_data("market", df_market)
+            st.success("Лот добавлен на витрину!")
+            st.rerun()
