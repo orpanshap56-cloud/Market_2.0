@@ -80,6 +80,11 @@ if st.session_state.page == "main":
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
         
+        ### НОВОЕ: Готовим подписи имен
+        creator = row.get('created_by', 'Система')
+        assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
+        creator_label = DISPLAY.get(creator, creator)
+        
         # Делаем три колонки: текст, кнопка "Готово" и корзина
         c1, c2, c3 = st.columns([3, 1, 0.5])
         
@@ -116,6 +121,9 @@ if st.session_state.page == "main":
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+                ### НОВОЕ: Подпись под активной задачей
+                c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
+                
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
@@ -125,11 +133,15 @@ if st.session_state.page == "main":
                     st.rerun()
             else:
                 c1.write(f"~~{row['title']}~~")
-                c1.caption(time_text)
+                ### НОВОЕ: Подпись под зачеркнутой задачей (на кулдауне)
+                c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
                 c2.button("⏳", key=f"t_{i}", disabled=True)
 
         else: # РАЗОВАЯ
             c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+            ### НОВОЕ: Подпись под разовой задачей
+            c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
+            
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                 db["balances"].loc[0, current_user] += int(row['reward'])
                 db["tasks"] = db["tasks"].drop(i)
