@@ -78,6 +78,43 @@ if st.session_state.page == "main":
     st.header("📋 Твои задачи")
     now = datetime.now()
 
+    # --- ФОРМА СОЗДАНИЯ ---
+    with st.expander("➕ Добавить задачу"):
+        # Убрали st.form, теперь интерфейс реагирует на каждый клик мгновенно
+        title = st.text_input("Что сделать?")
+        reward = st.number_input("Награда", min_value=1, value=10)
+        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"])
+        t_type = st.radio("Режим", ["Разовая", "Интервальная"])
+        
+        # Задаем пустые значения по умолчанию
+        val = 0
+        unit = ""
+        
+        # Магия тут: показываем настройки интервала ТОЛЬКО если тумблер на "Интервальная"
+        if t_type == "Интервальная":
+            c_val, c_unit = st.columns(2)
+            val = c_val.number_input("Интервал", min_value=1, value=12)
+            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
+            
+        if st.button("Создать"):
+            if not title:
+                st.warning("Напиши название задачи!")
+            else:
+                new_task = {
+                    "title": title, 
+                    "reward": reward, 
+                    "assigned_to": assignee, 
+                    "task_type": t_type, 
+                    "interval_value": val, 
+                    "interval_unit": unit, 
+                    "last_completed": "",
+                    "created_by": current_user  # Должно быть именно так
+                }
+                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
+                save_data("tasks", db["tasks"])
+                st.success("Задача добавлена!")
+                st.rerun()
+                
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
@@ -154,43 +191,6 @@ if st.session_state.page == "main":
                 new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                 save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-                st.rerun()
-
- # --- ФОРМА СОЗДАНИЯ ---
-    with st.expander("➕ Добавить задачу"):
-        # Убрали st.form, теперь интерфейс реагирует на каждый клик мгновенно
-        title = st.text_input("Что сделать?")
-        reward = st.number_input("Награда", min_value=1, value=10)
-        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"])
-        t_type = st.radio("Режим", ["Разовая", "Интервальная"])
-        
-        # Задаем пустые значения по умолчанию
-        val = 0
-        unit = ""
-        
-        # Магия тут: показываем настройки интервала ТОЛЬКО если тумблер на "Интервальная"
-        if t_type == "Интервальная":
-            c_val, c_unit = st.columns(2)
-            val = c_val.number_input("Интервал", min_value=1, value=12)
-            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
-            
-        if st.button("Создать"):
-            if not title:
-                st.warning("Напиши название задачи!")
-            else:
-                new_task = {
-                    "title": title, 
-                    "reward": reward, 
-                    "assigned_to": assignee, 
-                    "task_type": t_type, 
-                    "interval_value": val, 
-                    "interval_unit": unit, 
-                    "last_completed": "",
-                    "created_by": current_user  # Должно быть именно так
-                }
-                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
-                save_data("tasks", db["tasks"])
-                st.success("Задача добавлена!")
                 st.rerun()
                 
 # ==========================================
