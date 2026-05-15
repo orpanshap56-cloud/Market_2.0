@@ -221,3 +221,69 @@ if st.session_state.page == "main":
                 save_data("tasks", db["tasks"])
                 st.success("Задача добавлена!")
                 st.rerun()
+# ==========================================
+# ЭКРАН 2: ЛИЧНЫЙ КАБИНЕТ
+# ==========================================
+elif st.session_state.page == "profile":
+    st.title("👤 Личный кабинет")
+    
+    # --- НАСТРОЙКИ ПРОФИЛЯ (СМЕНА НИКА) ---
+    with st.expander("⚙️ Настройки профиля"):
+        new_name = st.text_input("Мой никнейм", value=DISPLAY[current_user])
+        if st.button("Сохранить"):
+            col_name = f"{current_user}_Имя"
+            
+            # Принудительно создаем колонку как текстовую, если её нет
+            if col_name not in db["balances"].columns:
+                db["balances"][col_name] = ""
+            
+            # Лечим ошибку Pandas: приводим к строковому типу
+            db["balances"][col_name] = db["balances"][col_name].astype(str)
+            db["balances"].loc[0, col_name] = new_name
+            
+            save_data("balances", db["balances"])
+            st.success("Ник обновлен! Синхронизирую...")
+            sync_database() 
+            st.rerun()
+
+    st.markdown("---")
+
+    # --- ОБЩАЯ СТАТИСТИКА ---
+    col_info1, col_info2, col_info3 = st.columns(3)
+    
+    # Считаем доходы от задач
+    earned = db['history'][(db['history']['buyer'] == current_user) & (db['history']['type'] == 'Работа')]['price'].sum()
+    # Считаем траты в магазине
+    spent = db['history'][(db['history']['buyer'] == current_user) & (db['history']['type'] == 'Покупка')]['price'].sum()
+    
+    col_info1.metric("Заработано 🪙", f"{earned}")
+    col_info2.metric("Потрачено 🪙", f"{spent}")
+    col_info3.metric("Рейтинг 💖", f"{my_rating}")
+
+    st.markdown("---")
+
+    # --- МОИ ЛОТЫ НА ВИТРИНЕ ---
+    st.subheader("📦 Мои товары в продаже")
+    my_lots = db["market"][db["market"]['seller'] == current_user]
+    if not my_lots.empty:
+        st.dataframe(my_lots[['title', 'price']], use_container_width=True, hide_index=True)
+    else:
+        st.write("Вы еще ничего не выставили на продажу.")
+
+    # --- ИСТОРИЯ ПОКУПОК ---
+    st.subheader("🛍️ История моих покупок")
+    my_buys = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Покупка')]
+    if not my_buys.empty:
+        st.dataframe(my_buys[['item', 'price', 'seller']], use_container_width=True, hide_index=True)
+    else:
+        st.write("Вы еще ничего не купили.")
+    
+    # --- МОИ ПРОДАЖИ (РЕЙТИНГ) ---
+    st.subheader("💖 За что получен рейтинг")
+    my_sales = db["history"][(db["history"]['seller'] == current_user) & (db["history"]['type'] == 'Покупка')]
+    if not my_sales.empty:
+        display_sales = my_sales[['item', 'price', 'buyer']].copy()
+        display_sales = display_sales.rename(columns={'price': 'получено 💖'})
+        st.dataframe(display_sales, use_container_width=True, hide_index=True)
+    else:
+        st.write("Ваши лоты еще не покупали.")
