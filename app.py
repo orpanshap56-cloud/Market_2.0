@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from datetime import datetime
 
 st.set_page_config(page_title="Семейная Монетизация", page_icon="💰", layout="centered")
 
@@ -14,7 +13,7 @@ PROFILES = {
 if "user" not in st.session_state:
     st.session_state.user = None
 if "page" not in st.session_state:
-    st.session_state.page = "main" # По умолчанию главная
+    st.session_state.page = "main"
 
 # --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
 if st.session_state.user is None:
@@ -43,19 +42,26 @@ try:
     df_balances = get_data("balances")
     df_tasks = get_data("tasks")
     df_market = get_data("market")
-    df_history = get_data("history") # Лист с историей
+    df_history = get_data("history")
+    
     муж_баланс = int(df_balances.loc[0, "Муж"])
     жена_баланс = int(df_balances.loc[0, "Жена"])
-except:
-    st.error("Ошибка базы! Проверь листы: balances, tasks, market, history.")
+    муж_рейтинг = int(df_balances.loc[0, "Муж_Рейтинг"])
+    жена_рейтинг = int(df_balances.loc[0, "Жена_Рейтинг"])
+except Exception as e:
+    st.error("Ошибка базы! Проверь листы: balances, tasks, market, history. И убедись, что добавил Муж_Рейтинг и Жена_Рейтинг!")
     st.stop()
 
 my_balance = муж_баланс if current_user == "Муж" else жена_баланс
+my_rating = муж_рейтинг if current_user == "Муж" else жена_рейтинг
 
-# --- САЙДБАР (НАВИГАЦИЯ) ---
+# --- САЙДБАР (НАВИГАЦИЯ И СТАТУС) ---
 with st.sidebar:
     st.title(f"{PROFILES[current_user]['avatar']} {current_user}")
-    st.metric("Мой баланс", f"{my_balance} 🪙")
+    
+    # Теперь тут два показателя
+    st.metric("Кошелек", f"{my_balance} 🪙")
+    st.metric("Рейтинг активности", f"{my_rating} 💖")
     
     st.markdown("---")
     if st.button("🏠 Главная", use_container_width=True):
@@ -82,7 +88,6 @@ if st.session_state.page == "main":
             if current_user == "Муж": df_balances.loc[0, "Муж"] += int(row['reward'])
             else: df_balances.loc[0, "Жена"] += int(row['reward'])
             
-            # Пишем в историю
             new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
             save_data("history", pd.concat([df_history, new_log]))
             save_data("balances", df_balances)
@@ -95,43 +100,32 @@ if st.session_state.page == "main":
         c1, c2 = st.columns([3, 1])
         price = int(row['price'])
         
-        # Проверяем, твой ли это лот
         is_my_item = (row['seller'] == current_user)
-        # Кнопка активна, если это не твой лот И хватает денег
         can_buy = (not is_my_item) and (my_balance >= price)
-        
-        # Меняем текст на кнопке для наглядности
         btn_label = "Мой лот" if is_my_item else "Купить"
         
         if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
-            # Логика покупки остается прежней
+            # НОВАЯ ЛОГИКА ЭКОНОМИКИ
             if current_user == "Муж":
-                df_balances.loc[0, "Муж"] -= price
-                if row['seller'] == "Жена": df_balances.loc[0, "Жена"] += price
+                df_balances.loc[0, "Муж"] -= price # Списываем монеты
+                if row['seller'] == "Жена": 
+                    df_balances.loc[0, "Жена_Рейтинг"] += price # Начисляем рейтинг партнеру
             else:
-                df_balances.loc[0, "Жена"] -= price
-                if row['seller'] == "Муж": df_balances.loc[0, "Муж"] += price
+                df_balances.loc[0, "Жена"] -= price # Списываем монеты
+                if row['seller'] == "Муж": 
+                    df_balances.loc[0, "Муж_Рейтинг"] += price # Начисляем рейтинг партнеру
             
-            # Пишем в историю
-            new_log = pd.DataFrame([{
-                "buyer": current_user, 
-                "item": row['title'], 
-                "price": price, 
-                "seller": row['seller'], 
-                "type": "Покупка"
-            }])
+            new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
             save_data("history", pd.concat([df_history, new_log]))
             save_data("balances", df_balances)
-            st.balloons()
-            st.rerun()
+            st.balloons(); st.rerun()
             
-        # Выводим название и цену. Если лот твой — пометим его
         display_name = f"🎁 **{row['title']}** ({price} 🪙)"
         if is_my_item:
             display_name += " *(Ваше предложение)*"
         c1.write(display_name)
 
-    # ФОРМЫ ДОБАВЛЕНИЯ (в экспандерах)
+    # ФОРМЫ ДОБАВЛЕНИЯ
     with st.expander("➕ Добавить задачу/лот"):
         tab1, tab2 = st.tabs(["Задача", "Лот"])
         with tab1:
@@ -155,9 +149,11 @@ if st.session_state.page == "main":
 elif st.session_state.page == "profile":
     st.title("👤 Личный кабинет")
     
-    col_info1, col_info2 = st.columns(2)
-    col_info1.metric("Заработано всего", f"{df_history[(df_history['buyer'] == current_user) & (df_history['type'] == 'Работа')]['price'].sum()} 🪙")
-    col_info2.metric("Потрачено всего", f"{df_history[(df_history['buyer'] == current_user) & (df_history['type'] == 'Покупка')]['price'].sum()} 🪙")
+    # Обновленная статистика с учетом сердечек
+    col_info1, col_info2, col_info3 = st.columns(3)
+    col_info1.metric("Заработано 🪙", f"{df_history[(df_history['buyer'] == current_user) & (df_history['type'] == 'Работа')]['price'].sum()}")
+    col_info2.metric("Потрачено 🪙", f"{df_history[(df_history['buyer'] == current_user) & (df_history['type'] == 'Покупка')]['price'].sum()}")
+    col_info3.metric("Рейтинг 💖", f"{my_rating}")
 
     st.subheader("📦 Мои товары на витрине")
     my_lots = df_market[df_market['seller'] == current_user]
@@ -166,16 +162,19 @@ elif st.session_state.page == "profile":
     else:
         st.write("Вы еще ничего не выставили на продажу.")
 
-    st.subheader("🛍️ История покупок")
+    st.subheader("🛍️ История покупок (на что ушли 🪙)")
     my_buys = df_history[(df_history['buyer'] == current_user) & (df_history['type'] == 'Покупка')]
     if not my_buys.empty:
         st.dataframe(my_buys[['item', 'price', 'seller']], use_container_width=True, hide_index=True)
     else:
         st.write("Вы еще ничего не купили.")
     
-    st.subheader("💰 Мои продажи (выручка)")
+    st.subheader("💖 За что получен рейтинг")
     my_sales = df_history[(df_history['seller'] == current_user) & (df_history['type'] == 'Покупка')]
     if not my_sales.empty:
-        st.dataframe(my_sales[['item', 'price', 'buyer']], use_container_width=True, hide_index=True)
+        # Переименовываем колонку price в интерфейсе, чтобы было понятно, что это теперь рейтинг
+        display_sales = my_sales[['item', 'price', 'buyer']].copy()
+        display_sales = display_sales.rename(columns={'price': 'получено 💖'})
+        st.dataframe(display_sales, use_container_width=True, hide_index=True)
     else:
-        st.write("У вас еще ничего не купили.")
+        st.write("Ваши лоты еще не покупали.")
