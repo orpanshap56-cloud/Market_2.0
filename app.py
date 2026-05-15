@@ -140,8 +140,6 @@ if st.session_state.page == "main":
                 
     # --- МАРКЕТПЛЕЙС ---
     st.header("🛒 Маркет")
-    # --- МАРКЕТПЛЕЙС ---
-    st.header("🛒 Маркет")
     for j, row in db["market"].iterrows():
         # Те же три колонки: описание, кнопка покупки и корзина
         c1, c2, c3 = st.columns([3, 1, 0.5])
