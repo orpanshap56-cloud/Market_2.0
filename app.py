@@ -73,16 +73,22 @@ with st.sidebar:
 # ГЛАВНАЯ СТРАНИЦА
 # ==========================================
 if st.session_state.page == "main":
-    st.title("📋 Твои задачи")
-    
+    st.header("📋 Твои задачи")
     now = datetime.now()
 
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
         
-        c1, c2 = st.columns([3, 1])
+        # Делаем три колонки: текст, кнопка "Готово" и корзина
+        c1, c2, c3 = st.columns([3, 1, 0.5])
         
+        # Кнопка удаления (доступна всем)
+        if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
+            db["tasks"] = db["tasks"].drop(i)
+            save_data("tasks", db["tasks"])
+            st.rerun()
+
         if t_type == "Интервальная":
             last_done_str = str(row.get('last_completed', ''))
             val = int(row.get('interval_value', 0))
@@ -93,10 +99,9 @@ if st.session_state.page == "main":
             
             if last_done_str:
                 last_done_dt = datetime.strptime(last_done_str, '%Y-%m-%d %H:%M:%S')
-                # Считаем кулдаун в зависимости от единиц
                 if unit == "Часы":
                     next_available = last_done_dt + timedelta(hours=val)
-                else: # Дни
+                else:
                     next_available = last_done_dt + timedelta(days=val)
                 
                 if now < next_available:
@@ -108,7 +113,6 @@ if st.session_state.page == "main":
                         hours, remainder = divmod(diff.seconds, 3600)
                         minutes, _ = divmod(remainder, 60)
                         time_text = f"⏳ Доступно через {hours}ч {minutes}м"
-
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
@@ -117,10 +121,7 @@ if st.session_state.page == "main":
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
                     new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                    
-                    save_data("balances", db["balances"])
-                    save_data("tasks", db["tasks"])
-                    save_data("history", db["history"])
+                    save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                     st.rerun()
             else:
                 c1.write(f"~~{row['title']}~~")
@@ -134,11 +135,9 @@ if st.session_state.page == "main":
                 db["tasks"] = db["tasks"].drop(i)
                 new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                save_data("balances", db["balances"])
-                save_data("tasks", db["tasks"])
-                save_data("history", db["history"])
+                save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                 st.rerun()
-
+                
     # --- МАРКЕТПЛЕЙС ---
     st.header("🛒 Маркет")
     for j, row in db["market"].iterrows():
