@@ -77,7 +77,12 @@ for j, item in enumerate(MARKET):
         with col_item:
             st.write(f"🎁 **{item['title']}** — Цена: {item['price']} 🪙 (Продавец: {item['seller']})")
         with col_buy:
-            active_balance = муж_баланс if current_user == "Муж" else_баланс = жена_баланс
+            # Нормальная проверка баланса текущего юзера
+            if current_user == "Муж":
+                active_balance = муж_баланс
+            else:
+                active_balance = жена_баланс
+                
             can_afford = active_balance >= item['price']
             
             if st.button(f"Купить", key=f"market_{j}", disabled=not can_afford):
