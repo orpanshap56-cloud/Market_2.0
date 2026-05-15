@@ -12,14 +12,14 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 # Читаем данные
 try:
     df = conn.read(worksheet="balances", ttl=0) # ttl=0 обновляет данные сразу
-    муж_баланс = int(df.iloc[0]["Муж"])
-    жена_баланс = int(df.iloc[0]["Жена"])
+    муж_баланс = int(df.loc[0, "Муж"])
+    жена_баланс = int(df.loc[0, "Жена"])
 except Exception as e:
     st.error("База данных еще не настроена в Secrets или таблица заполнена неверно!")
     st.info("Убедись, что в Secrets добавлен URL, а в таблице на листе 'balances' в первой строке написано Муж и Жена, а во второй — числа.")
     муж_баланс, жена_баланс = 0, 0
 
-# Список дел (если нужно изменить или добавить — правим прямо тут)
+# Список дел
 TASKS = [
     {"title": "Помыть посуду", "reward": 10, "assigned_to": "Муж"},
     {"title": "Приготовить обед", "reward": 15, "assigned_to": "Жена"},
@@ -53,12 +53,12 @@ for i, task in enumerate(TASKS):
         st.write(f"**{task['title']}** — {task['reward']} 🪙 (Кому: {task['assigned_to']})")
     with col_btn:
         # Кнопка активна, если задача для всех ("Оба") или конкретно для того, кто у экрана
-        is_my_task = (task['assigned_to'] == current_user or task['assigned_to'] == "Оба")
-        if st.button(f"Выполнено!", key=f"task_{i}", disabled=not is_my_task):
+        is_my_task = (task['assigned_to'] in [current_user, "Оба"])
+        if st.button("Выполнено!", key=f"task_{i}", disabled=not is_my_task):
             if current_user == "Муж":
-                df.iloc[0]["Муж"] = муж_баланс + task['reward']
+                df.loc[0, "Муж"] = муж_баланс + task['reward']
             else:
-                df.iloc[0]["Жена"] = жена_баланс + task['reward']
+                df.loc[0, "Жена"] = жена_баланс + task['reward']
             
             # Сохраняем в Google Таблицу
             conn.update(worksheet="balances", data=df)
@@ -77,25 +77,20 @@ for j, item in enumerate(MARKET):
         with col_item:
             st.write(f"🎁 **{item['title']}** — Цена: {item['price']} 🪙 (Продавец: {item['seller']})")
         with col_buy:
-            # Нормальная проверка баланса текущего юзера
-            if current_user == "Муж":
-                active_balance = муж_баланс
-            else:
-                active_balance = жена_баланс
-                
+            active_balance = муж_баланс if current_user == "Муж" else жена_баланс
             can_afford = active_balance >= item['price']
             
-            if st.button(f"Купить", key=f"market_{j}", disabled=not can_afford):
+            if st.button("Купить", key=f"market_{j}", disabled=not can_afford):
                 if current_user == "Муж":
-                    df.iloc[0]["Муж"] = муж_баланс - item['price']
+                    df.loc[0, "Муж"] = муж_баланс - item['price']
                     if item['seller'] == "Жена":
-                        df.iloc[0]["Жена"] = жена_баланс + item['price']
+                        df.loc[0, "Жена"] = жена_баланс + item['price']
                 else:
-                    df.iloc[0]["Жена"] = жена_баланс - item['price']
+                    df.loc[0, "Жена"] = жена_баланс - item['price']
                     if item['seller'] == "Муж":
-                        df.iloc[0]["Муж"] = муж_баланс + item['price']
+                        df.loc[0, "Муж"] = муж_баланс + item['price']
                 
                 conn.update(worksheet="balances", data=df)
                 st.balloons()
-                st.success(f"Куплено!")
+                st.success("Куплено!")
                 st.rerun()
