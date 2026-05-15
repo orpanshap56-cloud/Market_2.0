@@ -7,7 +7,6 @@ st.set_page_config(page_title="Семейная Экономика", page_icon="
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- ФУНКЦИИ БАЗЫ ---
 def get_data(sheet_name): return conn.read(worksheet=sheet_name, ttl=0)
 def save_data(sheet_name, df): conn.update(worksheet=sheet_name, data=df)
 
@@ -23,7 +22,6 @@ if "db" not in st.session_state: sync_database()
 if "user" not in st.session_state: st.session_state.user = None
 if "page" not in st.session_state: st.session_state.page = "main"
 
-# --- ЛОГИКА АВТОРИЗАЦИИ (ВЫБОР ПРОФИЛЯ) ---
 if st.session_state.user is None:
     st.title("Кто сегодня молодец? 😎")
     c1, c2 = st.columns(2)
@@ -60,30 +58,36 @@ if st.session_state.page == "main":
         c1, c2 = st.columns([3, 1])
         
         if t_type == "Интервальная":
-            # Расчет времени до следующего выполнения
             last_done_str = str(row.get('last_completed', ''))
-            interval = int(row.get('interval_hours', 0))
+            val = int(row.get('interval_value', 0))
+            unit = row.get('interval_unit', 'Часы')
             
             can_do = True
             time_text = ""
             
             if last_done_str:
                 last_done_dt = datetime.strptime(last_done_str, '%Y-%m-%d %H:%M:%S')
-                next_available = last_done_dt + timedelta(hours=interval)
+                # Считаем кулдаун в зависимости от единиц
+                if unit == "Часы":
+                    next_available = last_done_dt + timedelta(hours=val)
+                else: # Дни
+                    next_available = last_done_dt + timedelta(days=val)
                 
                 if now < next_available:
                     can_do = False
                     diff = next_available - now
-                    hours, remainder = divmod(diff.seconds, 3600)
-                    minutes, _ = divmod(remainder, 60)
-                    time_text = f"⏳ Будет доступно через {hours}ч {minutes}м"
+                    if diff.days > 0:
+                        time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+                    else:
+                        hours, remainder = divmod(diff.seconds, 3600)
+                        minutes, _ = divmod(remainder, 60)
+                        time_text = f"⏳ Доступно через {hours}ч {minutes}м"
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
-                    # Логируем
                     new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                     
@@ -94,17 +98,15 @@ if st.session_state.page == "main":
             else:
                 c1.write(f"~~{row['title']}~~")
                 c1.caption(time_text)
-                c2.button("Ждем", key=f"t_{i}", disabled=True)
+                c2.button("⏳", key=f"t_{i}", disabled=True)
 
-        else: # РАЗОВАЯ ЗАДАЧА
+        else: # РАЗОВАЯ
             c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                 db["balances"].loc[0, current_user] += int(row['reward'])
                 db["tasks"] = db["tasks"].drop(i)
-                
                 new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                
                 save_data("balances", db["balances"])
                 save_data("tasks", db["tasks"])
                 save_data("history", db["history"])
@@ -117,12 +119,17 @@ if st.session_state.page == "main":
             reward = st.number_input("Награда", min_value=1, value=10)
             assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"])
             t_type = st.radio("Режим", ["Разовая", "Интервальная"])
-            hours = st.number_input("Интервал (в часах)", min_value=1, value=6, help="Через сколько часов задача появится снова")
+            
+            c_val, c_unit = st.columns(2)
+            val = c_val.number_input("Интервал", min_value=1, value=12)
+            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
             
             if st.form_submit_button("Создать"):
                 new_data = {
                     "title": title, "reward": reward, "assigned_to": assignee,
-                    "task_type": t_type, "interval_hours": hours if t_type == "Интервальная" else 0,
+                    "task_type": t_type, 
+                    "interval_value": val if t_type == "Интервальная" else 0,
+                    "interval_unit": unit if t_type == "Интервальная" else "",
                     "last_completed": ""
                 }
                 db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_data])], ignore_index=True)
