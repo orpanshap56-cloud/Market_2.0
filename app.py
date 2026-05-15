@@ -169,7 +169,7 @@ if st.session_state.page == "main":
         with st.form("new_market_form", clear_on_submit=True):
             m_title = st.text_input("Что продаем?")
             m_price = st.number_input("Цена (🪙)", min_value=1, value=50)
-            m_seller = st.selectbox("Продавец", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x), index=0 if current_user=="Муж" else 1)
+            m_seller = st.selectbox("Продавец", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
             
             if st.form_submit_button("Выставить на маркет"):
                 if m_title:
