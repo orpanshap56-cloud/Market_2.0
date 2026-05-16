@@ -27,6 +27,7 @@ def send_telegram(text, target="Оба"):
                 
     except Exception as e:
         st.error(f"💥 Критическая ошибка функции: {e}")
+
 #-----Уровни--------
 def get_level_data(xp):
     level = 1
@@ -59,6 +60,7 @@ LEVEL_TITLES = {
     17: "Магистр Клининг",
     20: "Злая Алинка"
 }
+
 # ---  НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
@@ -67,22 +69,27 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def get_data(sheet_name): return conn.read(worksheet=sheet_name, ttl=0)
 def save_data(sheet_name, df): conn.update(worksheet=sheet_name, data=df)
 
-def sync_database():
-    st.session_state.db = {
-        "balances": get_data("balances"),
-        "tasks": get_data("tasks"),
-        "market": get_data("market"),
-        "history": get_data("history"),
-        "templates": get_data("templates"),
-        "reports": get_data("reports"),
-        "achievements": get_data("achievements")
-    }
+# --- НОВАЯ СИСТЕМА ЗАГРУЗКИ ПО ЭКРАНАМ ---
+if "db" not in st.session_state:
+    st.session_state.db = {}
 
-if "db" not in st.session_state: sync_database()
+def load_sheets(*sheet_names):
+    """Подгружает нужные листы, если их еще нет в памяти"""
+    for sheet in sheet_names:
+        if sheet not in st.session_state.db:
+            with st.spinner(f"Загрузка: {sheet}..."):
+                st.session_state.db[sheet] = get_data(sheet)
+
+def sync_database():
+    """Сбрасывает локальную память, чтобы скачать всё заново"""
+    st.session_state.db = {}
+    st.rerun()
+
 if "user" not in st.session_state: st.session_state.user = None
 if "page" not in st.session_state: st.session_state.page = "tasks"
 
-# --- ПОДГОТОВКА ДАННЫХ ИЗ КЭША ---
+# 1. Сначала грузим ТОЛЬКО балансы (это нужно для входа и сайдбара)
+load_sheets("balances")
 db = st.session_state.db 
 
 h_name = db["balances"].loc[0, "Муж_Имя"] if "Муж_Имя" in db["balances"].columns else "Муж"
@@ -140,11 +147,22 @@ with st.sidebar:
     st.markdown("---")
     if st.button("🔄 Синхронизировать", use_container_width=True): 
         sync_database()
-        st.rerun()
         
     if st.button("🚪 Выйти", use_container_width=True):
         st.session_state.user = None
         st.rerun()
+
+# --- 2. ДОГРУЗКА ДАННЫХ ДЛЯ ТЕКУЩЕЙ СТРАНИЦЫ ---
+if st.session_state.page == "tasks":
+    load_sheets("tasks", "templates", "history")
+
+elif st.session_state.page == "market":
+    load_sheets("market", "history")
+
+elif st.session_state.page == "profile":
+    # Для профиля нужно почти всё, чтобы посчитать ачивки и отчеты
+    load_sheets("tasks", "market", "history", "templates", "reports", "achievements")
+
         
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
