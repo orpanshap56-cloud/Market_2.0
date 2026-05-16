@@ -170,15 +170,21 @@ if st.session_state.page == "tasks":
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
-                ### НОВОЕ: Подпись под активной задачей
                 c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
                 
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
+                    
+                    # --- ВОТ ОН, НАШ СПАСИТЕЛЬНЫЙ КОСТЫЛЬ ---
+                    db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
+                    # ----------------------------------------
+                    
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
+                    
                     new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                     save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
+                    st.rerun()
                     st.rerun()
             else:
                 c1.write(f"~~{row['title']}~~")
