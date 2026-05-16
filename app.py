@@ -163,8 +163,12 @@ if st.session_state.page == "tasks":
         
         raw_creator = row.get('created_by')
         creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
-        raw_comment = row.get('comment', '')
         
+        # Лечим проблему отображения 'nan' в комментариях
+        raw_comment = str(row.get('comment', ''))
+        if raw_comment.lower() in ['nan', 'none', '']:
+            raw_comment = ""
+            
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
         
