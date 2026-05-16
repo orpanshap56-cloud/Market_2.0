@@ -145,10 +145,6 @@ with st.sidebar:
     if st.button("🚪 Выйти", use_container_width=True):
         st.session_state.user = None
         st.rerun()
-
-st.markdown("---")
-if st.button("🔔 Тест бота"):
-        send_telegram("🚀 Тестовое сообщение из твоего приложения!")
         
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
