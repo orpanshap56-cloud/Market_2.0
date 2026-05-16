@@ -138,29 +138,35 @@ if st.session_state.page == "tasks":
             st.rerun()
 
         if t_type == "Интервальная":
-            last_done_str = str(row.get('last_completed', ''))
-            val = int(row.get('interval_value', 0))
-            unit = row.get('interval_unit', 'Часы')
+            # 1. Берем значение как есть, не превращая сразу в строку
+            raw_last_done = row.get('last_completed')
             
+            # 2. Проверяем: не пусто ли там (и не NaN ли это)
             can_do = True
             time_text = ""
             
-            if last_done_str:
-                last_done_dt = datetime.strptime(last_done_str, '%Y-%m-%d %H:%M:%S')
-                if unit == "Часы":
-                    next_available = last_done_dt + timedelta(hours=val)
-                else:
-                    next_available = last_done_dt + timedelta(days=val)
-                
-                if now < next_available:
-                    can_do = False
-                    diff = next_available - now
-                    if diff.days > 0:
-                        time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+            if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
+                try:
+                    last_done_str = str(raw_last_done)
+                    last_done_dt = datetime.strptime(last_done_str, '%Y-%m-%d %H:%M:%S')
+                    
+                    if unit == "Часы":
+                        next_available = last_done_dt + timedelta(hours=val)
                     else:
-                        hours, remainder = divmod(diff.seconds, 3600)
-                        minutes, _ = divmod(remainder, 60)
-                        time_text = f"⏳ Доступно через {hours}ч {minutes}м"
+                        next_available = last_done_dt + timedelta(days=val)
+                    
+                    if now < next_available:
+                        can_do = False
+                        diff = next_available - now
+                        if diff.days > 0:
+                            time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+                        else:
+                            hours, remainder = divmod(diff.seconds, 3600)
+                            minutes, _ = divmod(remainder, 60)
+                            time_text = f"⏳ Доступно через {hours}ч {minutes}м"
+                except ValueError:
+                    # Если в таблице оказался какой-то левый текст, просто разрешаем делать задачу
+                    can_do = True
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
