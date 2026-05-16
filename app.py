@@ -198,9 +198,9 @@ if st.session_state.page == "tasks":
             c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
             c2.button("⏳", key=f"t_{i}", disabled=True)
 
-            else: # РАЗОВАЯ
-                c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
-                c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
+        else: # РАЗОВАЯ
+            c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
+            c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                 db["balances"].loc[0, current_user] += int(row['reward'])
