@@ -81,7 +81,7 @@ if st.session_state.page == "tasks":
 
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
-        if st.button("Создать"):
+        if st.button("Создать", key="create_task_btn"):
             # Добавим .strip() прямо тут
             clean_title = title.strip()
             
