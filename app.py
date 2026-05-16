@@ -329,3 +329,16 @@ elif st.session_state.page == "profile":
         st.dataframe(display_sales, use_container_width=True, hide_index=True)
     else:
         st.write("Ваши лоты еще не покупали.")
+
+    # --- ИСТОРИЯ ВЫПОЛНЕННЫХ ЗАДАЧ ---
+    st.markdown("---")
+    st.subheader("✅ Выполненные задачи")
+    my_tasks = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Работа')]
+    
+    if not my_tasks.empty:
+        # Отбираем нужные колонки и делаем красивые заголовки
+        display_tasks = my_tasks[['item', 'price']].copy()
+        display_tasks = display_tasks.rename(columns={'item': 'Что было сделано', 'price': 'Заработано 🪙'})
+        st.dataframe(display_tasks, use_container_width=True, hide_index=True)
+    else:
+        st.write("Вы еще не выполнили ни одной задачи. Время это исправить! 😉")
