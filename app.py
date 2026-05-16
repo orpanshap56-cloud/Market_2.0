@@ -16,7 +16,8 @@ def sync_database():
         "tasks": get_data("tasks"),
         "market": get_data("market"),
         "history": get_data("history"),
-        "templates": get_data("templates")
+        "templates": get_data("templates"),
+        "reports": get_data("reports") 
     }
 
 if "db" not in st.session_state: sync_database()
@@ -27,7 +28,6 @@ if "page" not in st.session_state: st.session_state.page = "tasks"
 if "db" not in st.session_state: sync_database()
 db = st.session_state.db 
 
-# Аккуратно читаем ники
 h_name = db["balances"].loc[0, "Муж_Имя"] if "Муж_Имя" in db["balances"].columns else "Муж"
 w_name = db["balances"].loc[0, "Жена_Имя"] if "Жена_Имя" in db["balances"].columns else "Жена"
 
@@ -86,7 +86,6 @@ now = datetime.now()
 if st.session_state.page == "tasks":
     st.title("✅ Задачи")
 
-    # --- БЛОК 1: ДОБАВЛЕНИЕ ЗАДАЧИ ---
     with st.expander("➕ Добавить новую задачу"):
         template_df = db.get("templates", pd.DataFrame(columns=["title", "reward"]))
         
@@ -107,7 +106,6 @@ if st.session_state.page == "tasks":
         title = st.text_input("Что сделать?", value=default_title, key=f"title_input_{selected_template}")
         reward = st.number_input("Награда (🪙)", min_value=1, value=default_reward, key=f"reward_input_{selected_template}")
         
-        # НОВОЕ ПОЛЕ ДЛЯ КОММЕНТАРИЯ
         task_comment = st.text_area("Комментарий / Уточнения (необязательно)", key=f"comment_{selected_template}")
         
         assignee = st.selectbox("Кто выполняет?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
@@ -127,7 +125,7 @@ if st.session_state.page == "tasks":
                 new_task = {
                     "title": clean_title,
                     "reward": reward,
-                    "comment": task_comment.strip(), # Сохраняем комментарий
+                    "comment": task_comment.strip(),
                     "assigned_to": assignee,
                     "task_type": t_type,
                     "interval_value": val,
@@ -140,7 +138,6 @@ if st.session_state.page == "tasks":
                 st.success(f"Задача '{clean_title}' добавлена!")
                 st.rerun()
 
-    # --- БЛОК 2: СОЗДАНИЕ ШАБЛОНОВ ---
     with st.expander("✨ Настройка шаблонов (Управление ценами)"):
         st.write("Создай постоянный тариф для частых задач, чтобы цена не путалась.")
         with st.form("new_template_form", clear_on_submit=True):
@@ -159,15 +156,13 @@ if st.session_state.page == "tasks":
 
     st.markdown("---")
 
-    # --- БЛОК 3: ВЫВОД ТЕКУЩИХ ЗАДАЧ ---
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
         
         raw_creator = row.get('created_by')
         creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
-        
-        raw_comment = row.get('comment', '') # Достаем комментарий
+        raw_comment = row.get('comment', '')
         
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
@@ -183,7 +178,6 @@ if st.session_state.page == "tasks":
             raw_last_done = row.get('last_completed')
             val = int(row.get('interval_value', 0))
             unit = row.get('interval_unit', 'Часы')
-            
             can_do = True
             time_text = ""
             
@@ -213,7 +207,6 @@ if st.session_state.page == "tasks":
             
             if can_do:
                 c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
-                # Если есть комментарий - выводим
                 if pd.notna(raw_comment) and str(raw_comment).strip() != "":
                     c1.caption(f"💬 *{str(raw_comment).strip()}*")
                 c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
@@ -224,15 +217,7 @@ if st.session_state.page == "tasks":
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
             
                     current_time = now.strftime("%d.%m.%Y %H:%M")
-                    new_log = pd.DataFrame([{
-                        "date": current_time, 
-                        "buyer": current_user, 
-                        "item": row['title'], 
-                        "price": row['reward'], 
-                        "seller": "Система", 
-                        "type": "Работа"
-                    }])
-                    
+                    new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                     save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                     st.rerun()
@@ -254,15 +239,7 @@ if st.session_state.page == "tasks":
                 db["tasks"] = db["tasks"].drop(i)
                 
                 current_time = now.strftime("%d.%m.%Y %H:%M")
-                new_log = pd.DataFrame([{
-                    "date": current_time, 
-                    "buyer": current_user, 
-                    "item": row['title'], 
-                    "price": row['reward'], 
-                    "seller": "Система", 
-                    "type": "Работа"
-                }])
-                
+                new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                 save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                 st.rerun()
@@ -307,8 +284,7 @@ elif st.session_state.page == "market":
             st.rerun()
             
         display_name = f"🎁 **{row['title']}** ({price} 🪙)"
-        if is_my_item: 
-            display_name += " *(Ваше)*"
+        if is_my_item: display_name += " *(Ваше)*"
         c1.write(display_name)
     
     with st.expander("🏷️ Выставить лот на продажу"):
@@ -321,7 +297,13 @@ elif st.session_state.page == "market":
                 if m_title:
                     new_item = {"title": m_title, "price": m_price, "seller": m_seller}
                     db["market"] = pd.concat([db["market"], pd.DataFrame([new_item])], ignore_index=True)
+                    
+                    current_time = now.strftime("%d.%m.%Y %H:%M")
+                    log_lot = pd.DataFrame([{"date": current_time, "buyer": m_seller, "item": m_title, "price": 0, "seller": "Система", "type": "Новый лот"}])
+                    db["history"] = pd.concat([db["history"], log_lot], ignore_index=True)
+                    
                     save_data("market", db["market"])
+                    save_data("history", db["history"])
                     st.success("Лот добавлен на витрину!")
                     st.rerun()
                 else:
@@ -339,10 +321,8 @@ elif st.session_state.page == "profile":
             col_name = f"{current_user}_Имя"
             if col_name not in db["balances"].columns:
                 db["balances"][col_name] = ""
-            
             db["balances"][col_name] = db["balances"][col_name].astype(str)
             db["balances"].loc[0, col_name] = new_name
-            
             save_data("balances", db["balances"])
             st.success("Ник обновлен! Синхронизирую...")
             sync_database() 
@@ -358,6 +338,69 @@ elif st.session_state.page == "profile":
     col_info2.metric("Потрачено 🪙", f"{spent}")
     col_info3.metric("Рейтинг 💖", f"{my_rating}")
 
+    st.markdown("---")
+    
+    # --- НОВЫЙ БЛОК: ОТЧЕТЫ И ЗАКРЫТИЕ МЕСЯЦА ---
+    st.subheader("📊 Итоги месяцев")
+    
+    with st.expander("🧹 Закрыть текущий период (Сформировать отчет)"):
+        st.warning("Внимание! Это соберет текущую историю, сделает вам ЛИЧНЫЕ текстовые отчеты и полностью очистит базу истории.")
+        if st.button("Сформировать отчет и очистить историю", use_container_width=True):
+            hist = db["history"]
+            if hist.empty:
+                st.error("История пуста, подводить итоги пока рано!")
+            else:
+                new_reports = []
+                # Пробегаемся по обоим юзерам и собираем им личную стату
+                for u in ["Муж", "Жена"]:
+                    tasks_done = len(hist[(hist["type"] == "Работа") & (hist["buyer"] == u)])
+                    lots_listed = len(hist[(hist["type"] == "Новый лот") & ((hist["buyer"] == u) | (hist["buyer"] == "Оба"))])
+                    lots_bought = len(hist[(hist["type"] == "Покупка") & (hist["buyer"] == u)])
+                    lots_sold = len(hist[(hist["type"] == "Покупка") & ((hist["seller"] == u) | (hist["seller"] == "Оба"))])
+                    
+                    coins_earned = hist[(hist["type"] == "Работа") & (hist["buyer"] == u)]["price"].sum()
+                    coins_spent = hist[(hist["type"] == "Покупка") & (hist["buyer"] == u)]["price"].sum()
+                    rating_earned = hist[(hist["type"] == "Покупка") & (hist["seller"] == u)]["price"].sum()
+                    
+                    report_text = (
+                        f"✅ Задач выполнено: {tasks_done} \n"
+                        f"📦 Лотов выставлено: {lots_listed} \n"
+                        f"🛍️ Лотов куплено: {lots_bought} \n"
+                        f"🤝 Лотов продано: {lots_sold} \n"
+                        f"🪙 Монет заработано: {coins_earned} \n"
+                        f"💸 Монет потрачено: {coins_spent} \n"
+                        f"💖 Рейтинга получено: {rating_earned}"
+                    )
+                    
+                    new_reports.append({"month": now.strftime("%m.%Y"), "user": u, "report_text": report_text})
+                
+                db["reports"] = pd.concat([db.get("reports", pd.DataFrame(columns=["month", "user", "report_text"])), pd.DataFrame(new_reports)], ignore_index=True)
+                
+                # Обнуляем общую историю
+                db["history"] = pd.DataFrame(columns=hist.columns)
+                
+                save_data("reports", db["reports"])
+                save_data("history", db["history"])
+                st.success("Отчеты для каждого сформированы, а история очищена!")
+                st.rerun()
+
+    # Вывод личных сохраненных отчетов
+    rep_df = db.get("reports", pd.DataFrame())
+    if not rep_df.empty:
+        # Убедимся, что колонка user есть
+        if "user" not in rep_df.columns:
+            rep_df["user"] = "Общий"
+            
+        my_reports = rep_df[(rep_df["user"] == current_user) | (rep_df["user"] == "Общий")]
+        
+        if not my_reports.empty:
+            for idx, r in my_reports.iterrows():
+                st.info(f"**Твой отчет за {r.get('month', 'Неизвестно')}**\n\n{r.get('report_text', '')}")
+        else:
+            st.write("Твоих сохраненных отчетов пока нет.")
+    else:
+        st.write("Сохраненных отчетов пока нет.")
+        
     st.markdown("---")
 
     st.subheader("📦 Мои товары в продаже")
@@ -375,7 +418,7 @@ elif st.session_state.page == "profile":
         else:
             st.dataframe(my_buys[['item', 'price', 'seller']], use_container_width=True, hide_index=True)
     else:
-        st.write("Вы еще ничего не купили.")
+        st.write("Пока пусто.")
     
     st.subheader("💖 За что получен рейтинг")
     my_sales = db["history"][(db["history"]['seller'] == current_user) & (db["history"]['type'] == 'Покупка')]
@@ -387,7 +430,7 @@ elif st.session_state.page == "profile":
         display_sales = display_sales.rename(columns={'price': 'получено 💖'})
         st.dataframe(display_sales, use_container_width=True, hide_index=True)
     else:
-        st.write("Ваши лоты еще не покупали.")
+        st.write("Пока пусто.")
 
     st.markdown("---")
     st.subheader("✅ Выполненные задачи")
@@ -403,4 +446,4 @@ elif st.session_state.page == "profile":
             
         st.dataframe(display_tasks, use_container_width=True, hide_index=True)
     else:
-        st.write("Вы еще не выполнили ни одной задачи. Время это исправить! 😉")
+        st.write("Пока пусто.")
