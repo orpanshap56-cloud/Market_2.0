@@ -17,7 +17,8 @@ def sync_database():
         "market": get_data("market"),
         "history": get_data("history"),
         "templates": get_data("templates"),
-        "reports": get_data("reports") 
+        "reports": get_data("reports"),
+        "achievements": get_data("achievements") # Наша новая вечная таблица
     }
 
 if "db" not in st.session_state: sync_database()
@@ -278,8 +279,7 @@ elif st.session_state.page == "market":
                 "type": "Покупка"
             }])
             db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-            save_data("balances", db["balances"])
-            save_data("history", db["history"])
+            save_data("balances", db["balances"]); save_data("history", db["history"])
             st.balloons()
             st.rerun()
             
@@ -338,20 +338,108 @@ elif st.session_state.page == "profile":
     col_info2.metric("Потрачено 🪙", f"{spent}")
     col_info3.metric("Рейтинг 💖", f"{my_rating}")
 
+    # ==========================================
+    # ВЕЧНАЯ СИСТЕМА ДОСТИЖЕНИЙ
+    # ==========================================
+    st.markdown("---")
+    st.subheader("🥇 Мои достижения")
+    
+    # Загружаем несгораемую базу ачивок
+    ach_db = db.get("achievements", pd.DataFrame(columns=["user", "achievement"]))
+    if ach_db.empty or "user" not in ach_db.columns:
+        ach_db = pd.DataFrame(columns=["user", "achievement"])
+        
+    # Список того, что юзер уже открыл намертво
+    my_forever_achievements = ach_db[ach_db["user"] == current_user]["achievement"].tolist()
+
+    # Сбор сырых данных для проверки текущих условий
+    hist_df = db.get("history", pd.DataFrame())
+    tasks_df = db.get("tasks", pd.DataFrame())
+    templates_df = db.get("templates", pd.DataFrame())
+    market_df = db.get("market", pd.DataFrame())
+
+    # Проверка условий (срабатывает, только если ачивка еще не была записана в вечный список)
+    has_comment = "scrupulous" in my_forever_achievements
+    if not has_comment and "comment" in tasks_df.columns and "created_by" in tasks_df.columns:
+        has_comment = tasks_df[(tasks_df["created_by"] == current_user) & (tasks_df["comment"].astype(str).str.strip() != "") & (tasks_df["comment"].astype(str).str.lower() != "nan")].shape[0] > 0
+
+    boss_unlocked = "boss" in my_forever_achievements
+    if not boss_unlocked and "created_by" in tasks_df.columns and "assigned_to" in tasks_df.columns:
+        boss_unlocked = tasks_df[(tasks_df["created_by"] == current_user) & (tasks_df["assigned_to"] != current_user)].shape[0] >= 5
+
+    templates_unlocked = "templates" in my_forever_achievements
+    if not templates_unlocked:
+        templates_unlocked = (templates_df.shape[0] >= 7) if not templates_df.empty else False
+
+    bazar_unlocked = "bazar" in my_forever_achievements
+    if not bazar_unlocked:
+        history_lots = hist_df[(hist_df["type"] == "Новый лот") & (hist_df["buyer"] == current_user)].shape[0] if not hist_df.empty else 0
+        current_lots = market_df[market_df["seller"] == current_user].shape[0] if not market_df.empty else 0
+        bazar_unlocked = (history_lots + current_lots) >= 3
+
+    stakhanov_unlocked = "stakhanov" in my_forever_achievements
+    if not stakhanov_unlocked:
+        stakhanov_unlocked = (hist_df[(hist_df["type"] == "Работа") & (hist_df["buyer"] == current_user)].shape[0] >= 10) if not hist_df.empty else False
+
+    # Массив для фиксации новых открытий прямо сейчас
+    newly_unlocked = []
+    
+    # Проверяем и дописываем новые выполнения в базу данных
+    conditions = {
+        "scrupulous": has_comment,
+        "boss": boss_unlocked,
+        "templates": templates_unlocked,
+        "bazar": bazar_unlocked,
+        "stakhanov": stakhanov_unlocked
+    }
+    
+    for ach_id, is_met in conditions.items():
+        if is_met and ach_id not in my_forever_achievements:
+            newly_unlocked.append({"user": current_user, "achievement": ach_id})
+            my_forever_achievements.append(ach_id) # Добавляем в локальный список для отрисовки
+
+    if newly_unlocked:
+        db["achievements"] = pd.concat([ach_db, pd.DataFrame(newly_unlocked)], ignore_index=True)
+        save_data("achievements", db["achievements"])
+        st.toast("🎉 Открыто новое достижение! Загляни в Личный Кабинет.")
+
+    # Словарь красивого вывода
+    ACH_INFO = {
+        "scrupulous": {"title": "🧐 Скрупулёзный", "desc": "Первый комментарий к заданию успешно оставлен! 🎉"},
+        "boss": {"title": "👑 Босс", "desc": "Поручено не менее 5 заданий на доске! Настоящий руководитель."},
+        "templates": {"title": "🧩 Шаблонное мышление", "desc": "Создано не менее 7 шаблонов задач. Стандартизация рулит!"},
+        "bazar": {"title": "🛍️ Баба базарная", "desc": "Выставлено не менее 3 лотов на продажу. Бизнес процветает!"},
+        "stakhanov": {"title": "🚜 Стахановец", "desc": "Выполнено не менее 10 задач за период. Гордость семьи!"}
+    }
+
+    # Отрисовка по новым правилам
+    col_ach1, col_ach2 = st.columns(2)
+    keys = list(ACH_INFO.keys())
+    
+    for idx, key in enumerate(keys):
+        target_col = col_ach1 if idx % 2 == 0 else col_ach2
+        info = ACH_INFO[key]
+        
+        if key in my_forever_achievements:
+            # Открытая ачивка — полноценная красивая карточка
+            target_col.success(f"**{info['title']}**\n\n{info['desc']}")
+        else:
+            # Закрытая ачивка — темно-серая скромная строчка без спойлеров
+            target_col.markdown(f"<p style='color: #777777; font-size: 16px; margin-bottom: 18px; font-weight: bold;'>🔒 {info['title']} — <span style='font-style: italic; font-weight: normal;'>Еще не открыто</span></p>", unsafe_allow_html=True)
+
     st.markdown("---")
     
-    # --- НОВЫЙ БЛОК: ОТЧЕТЫ И ЗАКРЫТИЕ МЕСЯЦА ---
+    # --- БЛОК: ОТЧЕТЫ И ЗАКРЫТИЕ МЕСЯЦА ---
     st.subheader("📊 Итоги месяцев")
     
     with st.expander("🧹 Закрыть текущий период (Сформировать отчет)"):
-        st.warning("Внимание! Это соберет текущую историю, сделает вам ЛИЧНЫЕ текстовые отчеты и полностью очистит базу истории.")
+        st.warning("Внимание! Это соберет текущую историю, сделает вам ЛИЧНЫЕ текстовые отчеты и полностью очистит базу истории. Вечные ачивки при этом НЕ пострадают.")
         if st.button("Сформировать отчет и очистить историю", use_container_width=True):
             hist = db["history"]
             if hist.empty:
                 st.error("История пуста, подводить итоги пока рано!")
             else:
                 new_reports = []
-                # Пробегаемся по обоим юзерам и собираем им личную стату
                 for u in ["Муж", "Жена"]:
                     tasks_done = len(hist[(hist["type"] == "Работа") & (hist["buyer"] == u)])
                     lots_listed = len(hist[(hist["type"] == "Новый лот") & ((hist["buyer"] == u) | (hist["buyer"] == "Оба"))])
@@ -375,8 +463,6 @@ elif st.session_state.page == "profile":
                     new_reports.append({"month": now.strftime("%m.%Y"), "user": u, "report_text": report_text})
                 
                 db["reports"] = pd.concat([db.get("reports", pd.DataFrame(columns=["month", "user", "report_text"])), pd.DataFrame(new_reports)], ignore_index=True)
-                
-                # Обнуляем общую историю
                 db["history"] = pd.DataFrame(columns=hist.columns)
                 
                 save_data("reports", db["reports"])
@@ -384,15 +470,11 @@ elif st.session_state.page == "profile":
                 st.success("Отчеты для каждого сформированы, а история очищена!")
                 st.rerun()
 
-    # Вывод личных сохраненных отчетов
     rep_df = db.get("reports", pd.DataFrame())
     if not rep_df.empty:
-        # Убедимся, что колонка user есть
         if "user" not in rep_df.columns:
             rep_df["user"] = "Общий"
-            
         my_reports = rep_df[(rep_df["user"] == current_user) | (rep_df["user"] == "Общий")]
-        
         if not my_reports.empty:
             for idx, r in my_reports.iterrows():
                 st.info(f"**Твой отчет за {r.get('month', 'Неизвестно')}**\n\n{r.get('report_text', '')}")
@@ -435,7 +517,6 @@ elif st.session_state.page == "profile":
     st.markdown("---")
     st.subheader("✅ Выполненные задачи")
     my_tasks = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Работа')]
-    
     if not my_tasks.empty:
         if 'date' in my_tasks.columns:
             display_tasks = my_tasks[['date', 'item', 'price']].copy()
@@ -443,7 +524,6 @@ elif st.session_state.page == "profile":
         else:
             display_tasks = my_tasks[['item', 'price']].copy()
             display_tasks = display_tasks.rename(columns={'item': 'Что было сделано', 'price': 'Заработано 🪙'})
-            
         st.dataframe(display_tasks, use_container_width=True, hide_index=True)
     else:
         st.write("Пока пусто.")
