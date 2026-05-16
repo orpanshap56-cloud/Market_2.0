@@ -503,38 +503,46 @@ elif st.session_state.page == "market":
                         st.rerun()
 
     st.markdown("---")
-    # --- ФОРМА СОЗДАНИЯ ЛОТА ---
-    with st.expander("🏷️ Выставить лот на продажу"):
-        with st.form("new_market_form", clear_on_submit=True):
-            m_title = st.text_input("Что продаем / На что копим?")
-            m_price = st.number_input("Цена или Цель (🪙)", min_value=1, value=50)
-            m_type = st.selectbox("Тип лота", ["Индивидуальный", "Общий"])
-            m_seller = st.selectbox("Кто предоставляет?", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
-            
-            if st.form_submit_button("Выставить на маркет", use_container_width=True):
-                if m_title.strip():
-                    new_item = {
-                        "title": m_title.strip(), 
-                        "price": m_price, 
-                        "seller": m_seller, 
-                        "type": m_type,
-                        "collected": 0,
-                        "contributions": ""
-                    }
-                    db["market"] = pd.concat([db["market"], pd.DataFrame([new_item])], ignore_index=True)
-                    
-                    current_time = now.strftime("%d.%m.%Y %H:%M")
-                    log_type = "Цель" if m_type == "Общий" else "Лот"
-                    log_lot = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": f"Новая {log_type}: {m_title}", "price": 0, "seller": "Система", "type": "Инфраструктура"}])
-                    db["history"] = pd.concat([db["history"], log_lot], ignore_index=True)
-                    
-                    save_data("market", db["market"])
-                    save_data("history", db["history"])
-                    st.success(f"{m_type} лот добавлен!")
-                    st.rerun()
-                else:
-                    st.warning("Введите название лота!")
+    # --- ФОРМА СОЗДАНИЯ ЛОТА (МОДАЛЬНОЕ ОКНО) ---
+    @st.dialog("🏷️ Выставить лот на продажу")
+    def add_market_modal():
+        m_title = st.text_input("Что продаем / На что копим?")
+        m_price = st.number_input("Цена или Цель (🪙)", min_value=1, value=50)
+        m_type = st.selectbox("Тип лота", ["Индивидуальный", "Общий"])
+        m_seller = st.selectbox("Кто предоставляет?", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+        
+        # Заменили st.form_submit_button на обычную кнопку, так как внутри окна форма уже не нужна
+        if st.button("Выставить на маркет", use_container_width=True):
+            if m_title.strip():
+                new_item = {
+                    "title": m_title.strip(), 
+                    "price": m_price, 
+                    "seller": m_seller, 
+                    "type": m_type,
+                    "collected": 0,
+                    "contributions": ""
+                }
+                db["market"] = pd.concat([db["market"], pd.DataFrame([new_item])], ignore_index=True)
+                
+                current_time = now.strftime("%d.%m.%Y %H:%M")
+                log_type = "Цель" if m_type == "Общий" else "Лот"
+                log_lot = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": f"Новая {log_type}: {m_title}", "price": 0, "seller": "Система", "type": "Инфраструктура"}])
+                db["history"] = pd.concat([db["history"], log_lot], ignore_index=True)
+                
+                save_data("market", db["market"])
+                save_data("history", db["history"])
+                
+                # st.rerun() мгновенно закроет окно, очистит поля и обновит витрину
+                st.rerun()
+            else:
+                st.warning("Введите название лота!")
+
+    st.markdown("---")
     
+    # Кнопка вызова окна в самом низу страницы
+    if st.button("🏷️ Выставить лот на продажу", use_container_width=True):
+        add_market_modal()
+        
 # ==========================================
 # ЭКРАН 3: ЛИЧНЫЙ КАБИНЕТ
 # ==========================================
