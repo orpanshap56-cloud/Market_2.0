@@ -20,7 +20,7 @@ def sync_database():
 
 if "db" not in st.session_state: sync_database()
 if "user" not in st.session_state: st.session_state.user = None
-if "page" not in st.session_state: st.session_state.page = "main"
+if "page" not in st.session_state: st.session_state.page = "tasks"
 
 # --- ПОДГОТОВКА ДАННЫХ ИЗ КЭША ---
 if "db" not in st.session_state: sync_database()
