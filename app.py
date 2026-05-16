@@ -3,27 +3,26 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ И СТИЛИЗАЦИЯ "ШТОРКИ" ---
+# --- 1. НАСТРОЙКИ И ЧИСТЫЙ СТИЛЬ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
 st.markdown("""
     <style>
-        /* Прячем стандартный сайдбар и хедер */
+        /* Полностью скрываем стандартный сайдбар и хедер */
         [data-testid="stSidebar"] {display: none;}
         [data-testid="stHeader"] {display: none;}
         
-        /* Стилизуем экспандер под серую панель-шторку */
-        .st_details_container, .st-emotion-cache-p5msec {
-            background-color: #f0f2f6 !important;
-            border-radius: 10px !important;
+        /* Убираем лишние отступы сверху, чтобы панель была в самом верху */
+        .block-container {padding-top: 1rem !important;}
+
+        /* Стилизуем нашу "шторку", чтобы она была серой и аккуратной */
+        .stExpander {
+            background-color: #f0f2f6;
+            border-radius: 15px !important;
             border: 1px solid #d1d5db !important;
         }
-        
-        /* Убираем лишние отступы сверху */
-        .block-container {padding-top: 1rem !important;}
-        
-        /* Делаем текст внутри шторки компактнее */
-        .stMarkdown p { margin-bottom: 5px !important; }
+        /* Делаем текст внутри шторки компактным */
+        .stMarkdown p { margin-bottom: 2px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -67,11 +66,9 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-# --- ВЫДВИЖНАЯ СЕРАЯ ПАНЕЛЬ СВЕРХУ ---
-# В заголовке сразу виден баланс, чтобы не открывать лишний раз
+# --- ВЕРХНЯЯ ВЫДВИЖНАЯ ПАНЕЛЬ (ШТОРКА) ---
+# Баланс вынесен в заголовок, чтобы его было видно всегда
 with st.expander(f"👤 {DISPLAY[current_user]} | 💰 {my_balance} | 💖 {my_rating}", expanded=False):
-    
-    # Кнопки навигации в ряд
     nav_cols = st.columns(3)
     if nav_cols[0].button("📋 Задачи", use_container_width=True, key="nav_t"):
         st.session_state.page = "tasks"; st.rerun()
@@ -81,15 +78,13 @@ with st.expander(f"👤 {DISPLAY[current_user]} | 💰 {my_balance} | 💖 {my_r
         st.session_state.page = "profile"; st.rerun()
     
     st.markdown("---")
-    
-    # Доп. функции
     c1, c2 = st.columns([3, 1])
-    if c1.button("🔄 Синхронизировать данные", use_container_width=True):
+    if c1.button("🔄 Синхронизировать базу", use_container_width=True):
         sync_database(); st.rerun()
     if c2.button("🚪 Выход", use_container_width=True):
         st.session_state.user = None; st.rerun()
 
-st.markdown("---") # Визуальная линия под панелью
+st.markdown("---") # Визуальная граница
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
