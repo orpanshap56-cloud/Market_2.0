@@ -157,6 +157,44 @@ if st.session_state.page == "tasks":
 
     st.markdown("---")
 
+# --- ПАТЧ: СОРТИРОВКА ЗАДАЧ ---
+    # Создаем временный список для сортировки
+    sorted_tasks = []
+    
+    for i, row in db["tasks"].iterrows():
+        t_type = row.get('task_type', 'Разовая')
+        can_do_now = True
+        
+        # Проверяем доступность интервальной задачи
+        if t_type == "Интервальная":
+            raw_last_done = row.get('last_completed')
+            val = int(row.get('interval_value', 0))
+            unit = row.get('interval_unit', 'Часы')
+            
+            if pd.notna(raw_last_done) and str(raw_last_done).strip() not in ["", "nan"]:
+                try:
+                    last_done_dt = pd.to_datetime(str(raw_last_done))
+                    if last_done_dt.tzinfo is not None:
+                        last_done_dt = last_done_dt.tz_localize(None)
+                    
+                    delta = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
+                    if now < (last_done_dt + delta):
+                        can_do_now = False
+                except:
+                    pass
+        
+        # Запоминаем индекс, саму строку и статус доступности
+        sorted_tasks.append({'index': i, 'row': row, 'available': can_do_now})
+
+    # Сортируем: сначала те, где available == True
+    sorted_tasks = sorted(sorted_tasks, key=lambda x: x['available'], reverse=True)
+
+    # ТЕПЕРЬ ЗАПУСКАЕМ ЦИКЛ ПО ОТСОРТИРОВАННОМУ СПИСКУ
+    for task_item in sorted_tasks:
+        i = task_item['index']
+        row = task_item['row']
+        # --- (Далее идет твой существующий код отрисовки карточки) ---
+    
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
