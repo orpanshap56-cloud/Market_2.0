@@ -302,7 +302,15 @@ if st.session_state.page == "tasks":
 
                 btn_c, status_c = st.columns([1, 1])
                 
+               # --- ЛОГИКА ДЛЯ ЗАДАЧ "ОБА" (ТУМБЛЕР) ---
+                is_joint = False
+                if row['assigned_to'] == "Оба" and can_do:
+                    is_joint = st.toggle("🤝 Выполнили вдвоем?", key=f"joint_tog_{idx}")
+                    if is_joint:
+                        st.caption("✨ Награда и опыт упадут обоим!")
+
                 if row['task_type'] == "Интервальная" and not can_do:
+                    # (Тут остается твой старый код расчета времени кулдауна)
                     last_dt = pd.to_datetime(str(row['last_completed'])).tz_localize(None)
                     delta = timedelta(hours=int(row['interval_value'])) if row['interval_unit'] == "Часы" else timedelta(days=int(row['interval_value']))
                     diff = (last_dt + delta) - now
@@ -312,19 +320,42 @@ if st.session_state.page == "tasks":
                     btn_c.button("⏳", key=f"wait_{idx}", disabled=True, use_container_width=True)
                 else:
                     if btn_c.button("✅ Готово!", key=f"done_{idx}", disabled=not is_my, use_container_width=True):
-                        db["balances"].loc[0, current_user] += int(row['reward'])
-                        db["balances"].loc[0, f"{current_user}_Рейтинг"] += 10
+                        # 1. ОПРЕДЕЛЯЕМ, КОМУ НАЧИСЛЯТЬ
+                        users_to_reward = []
+                        if is_joint:
+                            users_to_reward = ["Муж", "Жена"]
+                        else:
+                            users_to_reward = [current_user]
                         
+                        # 2. НАЧИСЛЯЕМ НАГРАДУ И ОПЫТ
+                        for u in users_to_reward:
+                            db["balances"].loc[0, u] += int(row['reward'])
+                            db["balances"].loc[0, f"{u}_Рейтинг"] += 10
+                        
+                        # 3. ЛОГИРУЕМ В ИСТОРИЮ
                         current_time = now.strftime("%d.%m.%Y %H:%M")
-                        new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+                        log_suffix = " (Совместно)" if is_joint else ""
+                        new_log = pd.DataFrame([{
+                            "date": current_time, 
+                            "buyer": current_user, 
+                            "item": f"{row['title']}{log_suffix}", 
+                            "price": row['reward'], 
+                            "seller": "Система", 
+                            "type": "Работа"
+                        }])
                         db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                         
+                        # 4. ОБНОВЛЯЕМ СОСТОЯНИЕ ЗАДАЧИ
                         if row['task_type'] == "Интервальная":
                             db["tasks"].loc[db["tasks"]["title"] == row["title"], "last_completed"] = now.strftime('%Y-%m-%d %H:%M:%S')
                         else:
                             db["tasks"] = db["tasks"][db["tasks"]["title"] != row["title"]]
                         
-                        save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
+                        save_data("balances", db["balances"])
+                        save_data("tasks", db["tasks"])
+                        save_data("history", db["history"])
+                        
+                        if is_joint: st.balloons() # Маленький праздник для двоих
                         st.rerun()
                 
 # ==========================================
