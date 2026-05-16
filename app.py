@@ -93,9 +93,9 @@ if st.session_state.page == "tasks":
                 }
                     # ... остальное без изменений
             title = st.text_input("Что сделать?")
-        reward = st.number_input("Награда", min_value=1, value=10)
-        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
-        t_type = st.radio("Режим", ["Разовая", "Интервальная"])
+            reward = st.number_input("Награда", min_value=1, value=10)
+            assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+            t_type = st.radio("Режим", ["Разовая", "Интервальная"])
         
         val, unit = 0, ""
         
