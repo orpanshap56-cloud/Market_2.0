@@ -81,6 +81,17 @@ if st.session_state.page == "tasks":
 
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
+        if st.button("Создать"):
+            # Добавим .strip() прямо тут
+            clean_title = title.strip()
+            
+            if not clean_title:
+                st.warning("Напиши название задачи!")
+            else:
+                new_task = {
+                    "title": clean_title,  # <-- И сохраняем уже чистый текст
+                    "reward": reward, 
+                    # ... остальное без изменений
         title = st.text_input("Что сделать?")
         reward = st.number_input("Награда", min_value=1, value=10)
         assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
