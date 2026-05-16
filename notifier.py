@@ -30,6 +30,7 @@ df = pd.DataFrame(sheet.get_all_records())
 
 now = datetime.now()
 ready_tasks = {"Муж": [], "Жена": []}
+CHECK_WINDOW_HOURS = 6 # Теперь проверяем окно в 6 часов
 
 for i, row in df.iterrows():
     if row['task_type'] == "Интервальная":
@@ -42,8 +43,12 @@ for i, row in df.iterrows():
             offset = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
             next_available = last_dt + offset
             
-            # Если задача стала доступна в последние 24 часа
-            if now >= next_available and (now - next_available).days < 1:
+            # Считаем разницу в секундах
+            time_diff = (now - next_available).total_seconds()
+            
+            # Если задача стала доступна в последние 6 часов (21600 секунд)
+            # Добавляем небольшой буфер (5 минут / 300 сек) на случай задержки запуска
+            if 0 <= time_diff < (CHECK_WINDOW_HOURS * 3600 + 300):
                 target = row['assigned_to']
                 if target == "Оба":
                     ready_tasks["Муж"].append(row['title'])
@@ -51,13 +56,14 @@ for i, row in df.iterrows():
                 else:
                     ready_tasks[target].append(row['title'])
 
-# Отправляем уведомления
+# Отправляем уведомления о задачах
 for user, tasks in ready_tasks.items():
     if tasks:
         msg = "🆕 Задания снова доступны:\n" + "\n".join([f"— {t}" for t in tasks])
         send_tg(msg, CHAT_IDS[user])
 
-# Напоминалка раз в 3 дня (проверка по дню недели, например, Пн и Чт)
-if datetime.now().weekday() in [0, 3]: # 0 = Понедельник, 3 = Четверг
+# Напоминалка раз в 3 дня (Пн и Чт)
+# 🔥 Добавляем проверку времени (now.hour), чтобы она приходила только один раз в день (например, в 12:00)
+if now.weekday() in [0, 3] and 11 <= now.hour <= 13:
     send_tg("🔔 Не забывайте заходить в приложение и отмечать успехи! 💰", CHAT_IDS["Муж"])
     send_tg("🔔 Не забывайте заходить в приложение и отмечать успехи! 💰", CHAT_IDS["Жена"])
