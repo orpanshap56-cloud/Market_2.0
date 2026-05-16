@@ -3,7 +3,31 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ И CSS ДЛЯ МОБИЛОК ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
+
+st.markdown("""
+    <style>
+        /* Сужаем боковую панель на мобилках до состояния док-бара */
+        @media (max-width: 640px) {
+            section[data-testid="stSidebar"] {
+                width: 85px !important;
+                min-width: 85px !important;
+            }
+            /* Скрываем текст внутри кнопок на мобилках, оставляя только эмодзи */
+            section[data-testid="stSidebar"] .stButton button p {
+                display: none;
+            }
+            section[data-testid="stSidebar"] .stButton button {
+                height: 55px;
+            }
+            /* Делаем заголовки и метрики в сайдбаре компактнее для узкой панели */
+            section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
+                font-size: 18px !important;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -18,7 +42,7 @@ def sync_database():
         "history": get_data("history"),
         "templates": get_data("templates"),
         "reports": get_data("reports"),
-        "achievements": get_data("achievements") # Наша новая вечная таблица
+        "achievements": get_data("achievements")
     }
 
 if "db" not in st.session_state: sync_database()
@@ -35,7 +59,6 @@ w_name = db["balances"].loc[0, "Жена_Имя"] if "Жена_Имя" in db["ba
 DISPLAY = {"Муж": h_name, "Жена": w_name, "Оба": "Оба"}
 
 # --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
-if "user" not in st.session_state: st.session_state.user = None
 if st.session_state.user is None:
     st.title("Кто сегодня молодец? 😎")
     c1, c2 = st.columns(2)
@@ -64,24 +87,24 @@ with st.sidebar:
         sync_database()
         st.rerun()
     
-    # НОВЫЕ КНОПКИ НАВИГАЦИИ
-    if st.button("📋 Список задач", use_container_width=True):
+    # КОМПАКТНАЯ НАВИГАЦИЯ (на мобилке останутся только иконки)
+    if st.button("📋 Задачи", use_container_width=True):
         if st.session_state.page != "tasks":
             st.session_state.page = "tasks"
             st.rerun()
             
-    if st.button("🛒 Маркетплейс", use_container_width=True):
+    if st.button("🛒 Маркет", use_container_width=True):
         if st.session_state.page != "market":
             st.session_state.page = "market"
             st.rerun()
             
-    if st.button("👤 Личный кабинет", use_container_width=True):
+    if st.button("👤 Профиль", use_container_width=True):
         if st.session_state.page != "profile":
             st.session_state.page = "profile"
             st.rerun()
         
     st.markdown("---")
-    if st.button("🚪 Выйти", use_container_width=True):
+    if st.button("🚪 Выход", use_container_width=True):
         st.session_state.user = None
         st.rerun()
 
