@@ -3,7 +3,32 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ ---
+#-----Уровни--------
+def get_level_data(xp):
+    level = 1
+    next_level_step = 100 # Сколько нужно опыта для перехода с 1 на 2
+    total_needed = 100    # Порог для достижения 2 уровня
+    
+    while xp >= total_needed:
+        level += 1
+        next_level_step = int(next_level_step * 1.3)
+        total_needed += next_level_step
+    
+    # Расчет прогресса внутри уровня
+    current_level_start = total_needed - next_level_step
+    xp_in_level = xp - current_level_start
+    return level, xp_in_level, next_level_step
+
+# Словарь для будущих статусов (пока просто заглушка)
+LEVEL_TITLES = {
+    1: "Новичок",
+    2: "Стажер",
+    3: "Умелец",
+    4: "Мастер",
+    5: "Магистр быта",
+    10: "Легенда дома"
+}
+# ---  НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -55,7 +80,18 @@ now = datetime.now()
 with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
     st.metric("Кошелек", f"{my_balance} 🪙")
-    st.metric("Рейтинг", f"{my_rating} 💖")
+    
+    # 🔥 СИСТЕМА УРОВНЕЙ
+    lvl, xp_current, xp_needed = get_level_data(my_rating)
+    title = LEVEL_TITLES.get(lvl, "Герой")
+    
+    st.markdown(f"### Уровень {lvl}: **{title}**")
+    # Прогресс-бар
+    progress = xp_current / xp_needed
+    st.progress(progress)
+    st.caption(f"Опыт: {xp_current} / {xp_needed} (Всего: {my_rating} 💖)")
+    
+    st.markdown("---")
     
     st.markdown("---")
     
@@ -244,6 +280,7 @@ if st.session_state.page == "tasks":
                 if can_do:
                     if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
                         db["balances"].loc[0, current_user] += int(row['reward'])
+                        db["balances"].loc[0, f"{current_user}_Рейтинг"] += 10
                         db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
                         db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
                         current_time = now.strftime("%d.%m.%Y %H:%M")
@@ -257,6 +294,7 @@ if st.session_state.page == "tasks":
             else:
                 if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
                     db["balances"].loc[0, current_user] += int(row['reward'])
+                    db["balances"].loc[0, f"{current_user}_Рейтинг"] += 10
                     db["tasks"] = db["tasks"].drop(i)
                     current_time = now.strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
