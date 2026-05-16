@@ -74,23 +74,64 @@ with st.sidebar:
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА
 # ==========================================
+# ==========================================
+# ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
+# ==========================================
 if st.session_state.page == "tasks":
     st.header("📋 Твои задачи")
     now = datetime.now()
 
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
-        # Убрали st.form, теперь интерфейс реагирует на каждый клик мгновенно
         title = st.text_input("Что сделать?")
         reward = st.number_input("Награда", min_value=1, value=10)
-        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"])
+        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
         t_type = st.radio("Режим", ["Разовая", "Интервальная"])
         
-        # Задаем пустые значения по умолчанию
-        val = 0
-        unit = ""
+        val, unit = 0, ""
         
-        # Магия тут: показываем настройки интервала ТОЛЬКО если тумблер на "Интервальная"
+        if t_type == "Интервальная":
+            c_val, c_unit = st.columns(2)
+            val = c_val.number_input("Интервал", min_value=1, value=12)
+            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
+            
+        if st.button("Создать"):
+            if not title:
+                st.warning("Напиши название задачи!")
+            else:
+                new_task = {
+                    "title": title, 
+                    "reward": reward, 
+                    "assigned_to": assignee, 
+                    "task_type": t_type, 
+                    "interval_value": val, 
+                    "interval_unit": unit, 
+                    "last_completed": "",
+                    "created_by": current_user
+                }
+                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
+                save_data("tasks", db["tasks"])
+                st.success("Задача добавлена!")
+                st.rerun()
+                
+    # --- ВЫВОД ЗАДАЧ ---
+    for i, row in db["tasks"].iterrows():
+        t_type = row.get('task_type', 'Разовая')
+        is_my = row['assigned_to'] in [current_user, "Оба"]
+        
+        raw_creator = row.get('created_by')
+        creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
+        
+        assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
+        creator_label = DISPLAY.get(creator, creator)
+        
+        c1, c2, c3 = st.columns([3, 1, 0.5])
+        
+        if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
+            db["tasks"] = db["tasks"].drop(i)
+            save_data("tasks", db["tasks"])
+            st.rerun()
+
         if t_type == "Интервальная":
             raw_last_done = row.get('last_completed')
             val = int(row.get('interval_value', 0))
@@ -101,10 +142,9 @@ if st.session_state.page == "tasks":
             
             if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
                 try:
-                    # 🔥 Бронебойный парсер: съест любой формат даты и времени
+                    # 🔥 Бронебойный парсер переехал на свое законное место
                     last_done_dt = pd.to_datetime(str(raw_last_done))
                     
-                    # Очищаем от возможных часовых поясов для честного сравнения
                     if last_done_dt.tzinfo is not None:
                         last_done_dt = last_done_dt.tz_localize(None)
                         
@@ -123,8 +163,9 @@ if st.session_state.page == "tasks":
                             minutes, _ = divmod(remainder, 60)
                             time_text = f"⏳ Доступно через {hours}ч {minutes}м"
                 except Exception as e:
-                    # Если уж совсем мусор прилетел, покажем ошибку
-                    st.warning(f"Что-то не так с датой в задаче: {e}")
+                    # Если что-то сломалось, мы БЛОКИРУЕМ задачу, а не разрешаем фармить
+                    can_do = False
+                    time_text = f"⚠️ Ошибка даты"
             
             if can_do:
                 c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
@@ -143,29 +184,18 @@ if st.session_state.page == "tasks":
                 c1.write(f"~~{row['title']}~~")
                 c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
                 c2.button("⏳", key=f"t_{i}", disabled=True)
+
+        else: # РАЗОВАЯ
+            c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+            c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
-        if st.button("Создать"):
-            if not title:
-                st.warning("Напиши название задачи!")
-            else:
-                new_task = {
-                    "title": title, 
-                    "reward": reward, 
-                    "assigned_to": assignee, 
-                    "task_type": t_type, 
-                    "interval_value": val, 
-                    "interval_unit": unit, 
-                    "last_completed": "",
-                    "created_by": current_user  # Должно быть именно так
-                }
-                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
-                save_data("tasks", db["tasks"])
-                st.success("Задача добавлена!")
+            if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
+                db["balances"].loc[0, current_user] += int(row['reward'])
+                db["tasks"] = db["tasks"].drop(i)
+                new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+                db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                 st.rerun()
-                
-    for i, row in db["tasks"].iterrows():
-        t_type = row.get('task_type', 'Разовая')
-        is_my = row['assigned_to'] in [current_user, "Оба"]
         
         # --- ИСПРАВЛЕННЫЙ БЛОК ИМЕН ---
         raw_creator = row.get('created_by')
