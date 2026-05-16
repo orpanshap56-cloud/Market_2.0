@@ -165,7 +165,7 @@ if st.session_state.page == "tasks":
                     time_text = f"⚠️ Ошибка даты"
             
             if can_do:
-                c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+              c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
                 c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
                 
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
@@ -178,12 +178,12 @@ if st.session_state.page == "tasks":
                     save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                     st.rerun()
             else:
-                c1.write(f"~~{row['title']}~~")
+                c1.write(f"~~{str(row['title']).strip()}~~")
                 c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
                 c2.button("⏳", key=f"t_{i}", disabled=True)
 
         else: # РАЗОВАЯ
-            c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+           c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
             c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
