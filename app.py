@@ -71,9 +71,7 @@ with st.sidebar:
     if st.button("🚪 Выйти", use_container_width=True):
         st.session_state.user = None; st.rerun()
 
-# ==========================================
-# ГЛАВНАЯ СТРАНИЦА
-# ==========================================
+
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
@@ -116,9 +114,6 @@ if st.session_state.page == "tasks":
                 
     # --- ВЫВОД ЗАДАЧ ---
     db["tasks"] = db["tasks"].reset_index(drop=True) 
-    
-    for i, row in db["tasks"].iterrows():
-        t_type = row.get('task_type', 'Разовая')
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
