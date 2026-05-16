@@ -38,8 +38,12 @@ if "user" not in st.session_state: st.session_state.user = None
 if st.session_state.user is None:
     st.title("Кто сегодня молодец? 😎")
     c1, c2 = st.columns(2)
-    if c1.button(f"Я {DISPLAY['Муж']}", use_container_width=True): st.session_state.user = "Муж"; st.rerun()
-    if c2.button(f"Я {DISPLAY['Жена']}", use_container_width=True): st.session_state.user = "Жена"; st.rerun()
+    if c1.button(f"Я {DISPLAY['Муж']}", use_container_width=True): 
+        st.session_state.user = "Муж"
+        st.rerun()
+    if c2.button(f"Я {DISPLAY['Жена']}", use_container_width=True): 
+        st.session_state.user = "Жена"
+        st.rerun()
     st.stop()
 
 current_user = st.session_state.user
@@ -57,24 +61,35 @@ with st.sidebar:
     st.metric("Рейтинг", f"{my_rating} 💖")
     
     st.markdown("---")
-    if st.button("🔄 Синхронизировать", use_container_width=True): sync_database(); st.rerun()
+    if st.button("🔄 Синхронизировать", use_container_width=True): 
+        sync_database()
+        st.rerun()
     
     # НОВЫЕ КНОПКИ НАВИГАЦИИ
     if st.button("📋 Список задач", use_container_width=True):
-        st.session_state.page = "tasks"; st.rerun()
+        st.session_state.page = "tasks"
+        st.rerun()
     if st.button("🛒 Маркетплейс", use_container_width=True):
-        st.session_state.page = "market"; st.rerun()
+        st.session_state.page = "market"
+        st.rerun()
     if st.button("👤 Личный кабинет", use_container_width=True):
-        st.session_state.page = "profile"; st.rerun()
+        st.session_state.page = "profile"
+        st.rerun()
         
     st.markdown("---")
     if st.button("🚪 Выйти", use_container_width=True):
-        st.session_state.user = None; st.rerun()
+        st.session_state.user = None
+        st.rerun()
 
+# Фиксируем текущее время для расчетов
+now = datetime.now()
 
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
+if st.session_state.page == "tasks":
+    st.title("✅ Задачи")
+
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
@@ -85,7 +100,7 @@ with st.sidebar:
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
         
-        # Вот эта строчка потерялась! Она создает колонки:
+        # Создаем колонки
         c1, c2, c3 = st.columns([3, 1, 0.5])
         
         if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
@@ -137,7 +152,7 @@ with st.sidebar:
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
             
                     # Добавляем текущую дату и время в историю
-                    current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    current_time = now.strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{
                         "date": current_time, 
                         "buyer": current_user, 
@@ -163,8 +178,15 @@ with st.sidebar:
                 db["balances"].loc[0, current_user] += int(row['reward'])
                 db["tasks"] = db["tasks"].drop(i) # Разовую задачу удаляем
                 
-                current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+                current_time = now.strftime("%d.%m.%Y %H:%M")
+                new_log = pd.DataFrame([{
+                    "date": current_time, 
+                    "buyer": current_user, 
+                    "item": row['title'], 
+                    "price": row['reward'], 
+                    "seller": "Система", 
+                    "type": "Работа"
+                }])
                 
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                 save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
@@ -174,7 +196,7 @@ with st.sidebar:
 # ЭКРАН: МАРКЕТПЛЕЙС
 # ==========================================
 elif st.session_state.page == "market":
-st.title("🛒 Маркетплейс")
+    st.title("🛒 Маркетплейс")
     
     for j, row in db["market"].iterrows():
         # Те же три колонки: описание, кнопка покупки и корзина
@@ -197,7 +219,9 @@ st.title("🛒 Маркетплейс")
                 partner_key = f"{row['seller']}_Рейтинг"
                 db["balances"].loc[0, partner_key] += price
             
+            current_time = now.strftime("%d.%m.%Y %H:%M")
             new_log = pd.DataFrame([{
+                "date": current_time,
                 "buyer": current_user, 
                 "item": row['title'], 
                 "price": price, 
@@ -215,7 +239,7 @@ st.title("🛒 Маркетплейс")
             display_name += " *(Ваше)*"
         c1.write(display_name)
     
-  # --- ДОБАВЛЕНИЕ ЛОТА ---
+    # --- ДОБАВЛЕНИЕ ЛОТА ---
     with st.expander("🏷️ Выставить лот на продажу"):
         with st.form("new_market_form", clear_on_submit=True):
             m_title = st.text_input("Что продаем?")
@@ -232,9 +256,8 @@ st.title("🛒 Маркетплейс")
                 else:
                     st.warning("Введи название лота!")
     
-
 # ==========================================
-# ЭКРАН 2: ЛИЧНЫЙ КАБИНЕТ
+# ЭКРАН 3: ЛИЧНЫЙ КАБИНЕТ
 # ==========================================
 elif st.session_state.page == "profile":
     st.title("👤 Личный кабинет")
@@ -286,7 +309,11 @@ elif st.session_state.page == "profile":
     st.subheader("🛍️ История моих покупок")
     my_buys = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Покупка')]
     if not my_buys.empty:
-        st.dataframe(my_buys[['item', 'price', 'seller']], use_container_width=True, hide_index=True)
+        # Проверяем, есть ли уже колонка date в таблице
+        if 'date' in my_buys.columns:
+            st.dataframe(my_buys[['date', 'item', 'price', 'seller']], use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(my_buys[['item', 'price', 'seller']], use_container_width=True, hide_index=True)
     else:
         st.write("Вы еще ничего не купили.")
     
@@ -294,7 +321,10 @@ elif st.session_state.page == "profile":
     st.subheader("💖 За что получен рейтинг")
     my_sales = db["history"][(db["history"]['seller'] == current_user) & (db["history"]['type'] == 'Покупка')]
     if not my_sales.empty:
-        display_sales = my_sales[['item', 'price', 'buyer']].copy()
+        if 'date' in my_sales.columns:
+            display_sales = my_sales[['date', 'item', 'price', 'buyer']].copy()
+        else:
+            display_sales = my_sales[['item', 'price', 'buyer']].copy()
         display_sales = display_sales.rename(columns={'price': 'получено 💖'})
         st.dataframe(display_sales, use_container_width=True, hide_index=True)
     else:
@@ -306,9 +336,14 @@ elif st.session_state.page == "profile":
     my_tasks = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Работа')]
     
     if not my_tasks.empty:
-        # Отбираем нужные колонки и делаем красивые заголовки
-        display_tasks = my_tasks[['item', 'price']].copy()
-        display_tasks = display_tasks.rename(columns={'item': 'Что было сделано', 'price': 'Заработано 🪙'})
+        # Отбираем нужные колонки с проверкой на наличие date
+        if 'date' in my_tasks.columns:
+            display_tasks = my_tasks[['date', 'item', 'price']].copy()
+            display_tasks = display_tasks.rename(columns={'date': 'Когда', 'item': 'Что было сделано', 'price': 'Заработано 🪙'})
+        else:
+            display_tasks = my_tasks[['item', 'price']].copy()
+            display_tasks = display_tasks.rename(columns={'item': 'Что было сделано', 'price': 'Заработано 🪙'})
+            
         st.dataframe(display_tasks, use_container_width=True, hide_index=True)
     else:
         st.write("Вы еще не выполнили ни одной задачи. Время это исправить! 😉")
