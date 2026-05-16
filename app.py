@@ -3,31 +3,8 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ И CSS ДЛЯ МОБИЛОК ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
-
-st.markdown("""
-    <style>
-        /* Сужаем боковую панель на мобилках до состояния док-бара */
-        @media (max-width: 640px) {
-            section[data-testid="stSidebar"] {
-                width: 85px !important;
-                min-width: 85px !important;
-            }
-            /* Скрываем текст внутри кнопок на мобилках, оставляя только эмодзи */
-            section[data-testid="stSidebar"] .stButton button p {
-                display: none;
-            }
-            section[data-testid="stSidebar"] .stButton button {
-                height: 55px;
-            }
-            /* Делаем заголовки и метрики в сайдбаре компактнее для узкой панели */
-            section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
-                font-size: 18px !important;
-            }
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -76,7 +53,7 @@ partner = "Жена" if current_user == "Муж" else "Муж"
 my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 
-# --- САЙДБАР ---
+# --- САЙДБАР (Теперь только инфо и выход) ---
 with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
     st.metric("Кошелек", f"{my_balance} 🪙")
@@ -86,22 +63,6 @@ with st.sidebar:
     if st.button("🔄 Синхронизировать", use_container_width=True): 
         sync_database()
         st.rerun()
-    
-    # КОМПАКТНАЯ НАВИГАЦИЯ (на мобилке останутся только иконки)
-    if st.button("📋 Задачи", use_container_width=True):
-        if st.session_state.page != "tasks":
-            st.session_state.page = "tasks"
-            st.rerun()
-            
-    if st.button("🛒 Маркет", use_container_width=True):
-        if st.session_state.page != "market":
-            st.session_state.page = "market"
-            st.rerun()
-            
-    if st.button("👤 Профиль", use_container_width=True):
-        if st.session_state.page != "profile":
-            st.session_state.page = "profile"
-            st.rerun()
         
     st.markdown("---")
     if st.button("🚪 Выход", use_container_width=True):
@@ -109,6 +70,26 @@ with st.sidebar:
         st.rerun()
 
 now = datetime.now()
+
+# --- ВЕРХНЯЯ НАВИГАЦИЯ (Идеально для мобилок и ПК) ---
+nav_cols = st.columns(3)
+
+if nav_cols[0].button("📋 Задачи", use_container_width=True):
+    if st.session_state.page != "tasks":
+        st.session_state.page = "tasks"
+        st.rerun()
+            
+if nav_cols[1].button("🛒 Маркет", use_container_width=True):
+    if st.session_state.page != "market":
+        st.session_state.page = "market"
+        st.rerun()
+            
+if nav_cols[2].button("👤 Профиль", use_container_width=True):
+    if st.session_state.page != "profile":
+        st.session_state.page = "profile"
+        st.rerun()
+
+st.markdown("---")
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
