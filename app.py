@@ -3,40 +3,40 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ И ЖЕСТКИЙ CSS ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ И СТИЛЬ ПАНЕЛИ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
+# Чистый CSS без "приклеивания" всего подряд
 st.markdown("""
     <style>
-        /* Прячем стандартные элементы Streamlit */
+        /* Прячем стандартные элементы */
         [data-testid="stSidebar"] {display: none;}
         [data-testid="stHeader"] {display: none;}
+        .block-container {padding-top: 1rem !important;}
+
+        /* Стилизуем нашу серую панель */
+        .st-emotion-cache-12fmjuu { /* Контейнер кнопок */
+            background-color: #f0f2f6;
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid #d1d5db;
+        }
         
-        /* Фиксируем ПЕРВЫЙ блок (нашу панель) */
-        div[data-testid="stVerticalBlock"] > div:first-child {
+        /* Делаем верхнюю панель фиксированной */
+        [data-testid="stVerticalBlockBorderWrapper"] > div:first-child {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            background-color: #f0f2f6; /* Светло-серый цвет (фирменный стиль Streamlit) */
+            background-color: #f0f2f6;
             z-index: 999999;
-            padding: 10px 10% 20px 10%;
-            border-bottom: 2px solid #d1d5db; /* Чуть более темная граница снизу */
+            padding: 10px 5% 15px 5%;
+            border-bottom: 2px solid #d1d5db;
         }
 
-        /* Отступ для контента */
-        div[data-testid="stVerticalBlock"] > div:nth-child(2) {
-            margin-top: 180px !important;
-        }
-        
-        .block-container {
-            padding-top: 0rem !important;
-        }
-
-        /* Чтобы кнопки на сером фоне выглядели четче */
-        div[data-testid="stVerticalBlock"] > div:first-child .stButton button {
-            background-color: white;
-            border: 1px solid #d1d5db;
+        /* Отступ основного контента, чтобы он не прятался */
+        .main-content-spacer {
+            margin-top: 170px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -81,25 +81,28 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-# --- ОТРИСОВКА ПАНЕЛИ (ОНА ПЕРВАЯ В КОДЕ — ОНА И ЗАМРЕТ) ---
-# Важно: это должен быть самый первый UI-элемент после выбора профиля
-nav_container = st.container()
-with nav_container:
+# --- ОТРИСОВКА ФИКСИРОВАННОЙ СЕРОЙ ПАНЕЛИ ---
+# Этот блок всегда первый и всегда серый
+top_placeholder = st.empty()
+with st.container():
     # Строка 1: Инфо
-    c1, c2, c3 = st.columns([1.5, 2, 0.5])
-    c1.write(f"👤 **{DISPLAY[current_user]}**")
-    c2.write(f"💰 **{my_balance}** | 💖 **{my_rating}**")
-    if c3.button("🚪", key="exit_btn"):
+    inf1, inf2, inf3 = st.columns([1.5, 2, 0.5])
+    inf1.write(f"👤 **{DISPLAY[current_user]}**")
+    inf2.write(f"💰 **{my_balance}** | 💖 **{my_rating}**")
+    if inf3.button("🚪", key="exit_key"):
         st.session_state.user = None; st.rerun()
 
-    # Строка 2: Кнопки
-    n1, n2, n3 = st.columns(3)
-    if n1.button("📋 Задачи", use_container_width=True, key="nav_tasks"):
+    # Строка 2: Навигация
+    nav1, nav2, nav3 = st.columns(3)
+    if nav1.button("📋 Задачи", use_container_width=True, key="n_tasks"):
         st.session_state.page = "tasks"; st.rerun()
-    if n2.button("🛒 Маркет", use_container_width=True, key="nav_market"):
+    if nav2.button("🛒 Маркет", use_container_width=True, key="n_market"):
         st.session_state.page = "market"; st.rerun()
-    if n3.button("👤 Инфо", use_container_width=True, key="nav_profile"):
+    if nav3.button("👤 Инфо", use_container_width=True, key="n_profile"):
         st.session_state.page = "profile"; st.rerun()
+
+# Создаем физический отступ
+st.markdown('<div class="main-content-spacer"></div>', unsafe_allow_html=True)
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
