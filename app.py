@@ -412,7 +412,70 @@ elif st.session_state.page == "market":
                             save_data("balances", db["balances"]); save_data("market", db["market"]); save_data("history", db["history"])
                             st.rerun()
                     else:
-                        c2.success("
+                        c2.success("Готово! 🎉")
+                        if c2.button("Закрыть цель", key=f"close_{j}", use_container_width=True):
+                            db["market"] = db["market"][db["market"]["title"] != row["title"]]
+                            save_data("market", db["market"])
+                            st.rerun()
+
+                else:
+                    # --- ЛОГИКА ИНДИВИДУАЛЬНОГО ЛОТА ---
+                    is_my_item = (row['seller'] == current_user)
+                    can_buy = (not is_my_item) and (my_balance >= price)
+                    btn_label = "Мой лот" if is_my_item else f"Купить"
+                    
+                    c1.write(f"🎁 **{row['title']}** ({price} 🪙)")
+                    if is_my_item: c1.caption("*(Ваше на витрине)*")
+                    
+                    if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy, use_container_width=True):
+                        db["balances"].loc[0, current_user] -= price
+                        if row['seller'] != "Оба":
+                            partner_key = f"{row['seller']}_Рейтинг"
+                            db["balances"].loc[0, partner_key] += price
+                        
+                        current_time = now.strftime("%d.%m.%Y %H:%M")
+                        new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
+                        db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                        
+                        # Удаляем купленный лот
+                        db["market"] = db["market"][db["market"]["title"] != row["title"]]
+                        
+                        save_data("balances", db["balances"]); save_data("market", db["market"]); save_data("history", db["history"])
+                        st.balloons()
+                        st.rerun()
+
+    st.markdown("---")
+    # --- ФОРМА СОЗДАНИЯ ЛОТА ---
+    with st.expander("🏷️ Выставить лот на продажу"):
+        with st.form("new_market_form", clear_on_submit=True):
+            m_title = st.text_input("Что продаем / На что копим?")
+            m_price = st.number_input("Цена или Цель (🪙)", min_value=1, value=50)
+            m_type = st.selectbox("Тип лота", ["Индивидуальный", "Общий"])
+            m_seller = st.selectbox("Кто предоставляет?", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+            
+            if st.form_submit_button("Выставить на маркет", use_container_width=True):
+                if m_title.strip():
+                    new_item = {
+                        "title": m_title.strip(), 
+                        "price": m_price, 
+                        "seller": m_seller, 
+                        "type": m_type,
+                        "collected": 0,
+                        "contributions": ""
+                    }
+                    db["market"] = pd.concat([db["market"], pd.DataFrame([new_item])], ignore_index=True)
+                    
+                    current_time = now.strftime("%d.%m.%Y %H:%M")
+                    log_type = "Цель" if m_type == "Общий" else "Лот"
+                    log_lot = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": f"Новая {log_type}: {m_title}", "price": 0, "seller": "Система", "type": "Инфраструктура"}])
+                    db["history"] = pd.concat([db["history"], log_lot], ignore_index=True)
+                    
+                    save_data("market", db["market"])
+                    save_data("history", db["history"])
+                    st.success(f"{m_type} лот добавлен!")
+                    st.rerun()
+                else:
+                    st.warning("Введите название лота!")
     
 # ==========================================
 # ЭКРАН 3: ЛИЧНЫЙ КАБИНЕТ
