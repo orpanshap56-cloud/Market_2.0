@@ -223,10 +223,52 @@ if st.session_state.page == "tasks":
 
     st.markdown("---")
 
-# --- ПАТЧ: СОРТИРОВКА ЗАДАЧ ---
+# ==========================================
+# ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ
+# ==========================================
+    st.subheader("🔍 Фильтры и поиск")
+    
+    # Делаем три колонки для фильтров
+    c_f1, c_f2, c_f3 = st.columns(3)
+    
+    f_assignee = c_f1.selectbox(
+        "Для кого?", 
+        ["Все", "Муж", "Жена", "Оба"], 
+        format_func=lambda x: DISPLAY.get(x, x)
+    )
+    
+    f_type = c_f2.selectbox(
+        "Тип задачи", 
+        ["Все", "Разовые", "Интервальные"]
+    )
+    
+    f_sort = c_f3.selectbox(
+        "Награда", 
+        ["По умолчанию", "Сначала дорогие", "Сначала дешевые"]
+    )
+
+    # Копируем данные для фильтрации, чтобы не менять оригинал в сессии
+    df_filtered = db["tasks"].copy()
+
+    # 1. Фильтр по исполнителю
+    if f_assignee != "Все":
+        df_filtered = df_filtered[df_filtered["assigned_to"] == f_assignee]
+
+    # 2. Фильтр по типу
+    if f_type != "Все":
+        target_type = "Разовая" if f_type == "Разовые" else "Интервальная"
+        df_filtered = df_filtered[df_filtered["task_type"] == target_type]
+
+    # 3. Сортировка по цене
+    if f_sort == "Сначала дорогие":
+        df_filtered = df_filtered.sort_values(by="reward", ascending=False)
+    elif f_sort == "Сначала дешевые":
+        df_filtered = df_filtered.sort_values(by="reward", ascending=True)
+
+    # --- ПАТЧ: ПРОВЕРКА ДОСТУПНОСТИ И СОРТИРОВКА (ДОСТУПНЫЕ ВВЕРХУ) ---
     sorted_tasks = []
     
-    for i, row in db["tasks"].iterrows():
+    for i, row in df_filtered.iterrows():
         t_type = row.get('task_type', 'Разовая')
         can_do_now = True
         
@@ -249,13 +291,17 @@ if st.session_state.page == "tasks":
         
         sorted_tasks.append({'index': i, 'row': row, 'available': can_do_now})
 
-    # Сортируем: сначала доступные (True), потом недоступные (False)
+    # Сортируем: сначала доступные. 
+    # Python sorted стабилен, поэтому порядок по цене сохранится внутри групп доступности.
     sorted_tasks = sorted(sorted_tasks, key=lambda x: x['available'], reverse=True)
 
-    # ЕДИНЫЙ ЦИКЛ ОТРИСОВКИ
-    for task_item in sorted_tasks:
-        i = task_item['index']
-        row = task_item['row']
+    # --- ЕДИНЫЙ ЦИКЛ ОТРИСОВКИ ---
+    if not sorted_tasks:
+        st.info("Задач с такими фильтрами не найдено. Попробуй сбросить фильтры!")
+    else:
+        for task_item in sorted_tasks:
+            i = task_item['index']
+            row = task_item['row']
         
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
