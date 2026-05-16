@@ -293,25 +293,33 @@ elif st.session_state.page == "market":
     
     with st.expander("🏷️ Выставить лот на продажу"):
         with st.form("new_market_form", clear_on_submit=True):
-            m_title = st.text_input("Что продаем?")
-            m_price = st.number_input("Цена (🪙)", min_value=1, value=50)
-            m_seller = st.selectbox("Продавец", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+            m_title = st.text_input("Что продаем / На что копим?")
+            m_price = st.number_input("Цена или Цель (🪙)", min_value=1, value=50)
+            m_type = st.selectbox("Тип лота", ["Индивидуальный", "Общий"])
+            m_seller = st.selectbox("Кто предоставляет?", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
             
             if st.form_submit_button("Выставить на маркет"):
                 if m_title:
-                    new_item = {"title": m_title, "price": m_price, "seller": m_seller}
+                    new_item = {
+                        "title": m_title, 
+                        "price": m_price, 
+                        "seller": m_seller, 
+                        "type": m_type,
+                        "collected": 0,
+                        "contributions": ""
+                    }
                     db["market"] = pd.concat([db["market"], pd.DataFrame([new_item])], ignore_index=True)
                     
+                    # Логируем создание
                     current_time = now.strftime("%d.%m.%Y %H:%M")
-                    log_lot = pd.DataFrame([{"date": current_time, "buyer": m_seller, "item": m_title, "price": 0, "seller": "Система", "type": "Новый лот"}])
+                    log_type = "Цель" if m_type == "Общий" else "Лот"
+                    log_lot = pd.DataFrame([{"date": current_time, "buyer": m_seller, "item": f"Новая {log_type}: {m_title}", "price": 0, "seller": "Система", "type": "Инфраструктура"}])
                     db["history"] = pd.concat([db["history"], log_lot], ignore_index=True)
                     
                     save_data("market", db["market"])
                     save_data("history", db["history"])
-                    st.success("Лот добавлен на витрину!")
+                    st.success(f"{m_type} лот добавлен!")
                     st.rerun()
-                else:
-                    st.warning("Введи название лота!")
     
 # ==========================================
 # ЭКРАН 3: ЛИЧНЫЙ КАБИНЕТ
