@@ -91,10 +91,58 @@ if st.session_state.page == "tasks":
         unit = ""
         
         # Магия тут: показываем настройки интервала ТОЛЬКО если тумблер на "Интервальная"
-        if t_type == "Интервальная":
-            c_val, c_unit = st.columns(2)
-            val = c_val.number_input("Интервал", min_value=1, value=12)
-            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
+       if t_type == "Интервальная":
+            raw_last_done = row.get('last_completed')
+            val = int(row.get('interval_value', 0))
+            unit = row.get('interval_unit', 'Часы')
+            
+            can_do = True
+            time_text = ""
+            
+            if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
+                try:
+                    # 🔥 Бронебойный парсер: съест любой формат даты и времени
+                    last_done_dt = pd.to_datetime(str(raw_last_done))
+                    
+                    # Очищаем от возможных часовых поясов для честного сравнения
+                    if last_done_dt.tzinfo is not None:
+                        last_done_dt = last_done_dt.tz_localize(None)
+                        
+                    if unit == "Часы":
+                        next_available = last_done_dt + timedelta(hours=val)
+                    else:
+                        next_available = last_done_dt + timedelta(days=val)
+                    
+                    if now < next_available:
+                        can_do = False
+                        diff = next_available - now
+                        if diff.days > 0:
+                            time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+                        else:
+                            hours, remainder = divmod(diff.seconds, 3600)
+                            minutes, _ = divmod(remainder, 60)
+                            time_text = f"⏳ Доступно через {hours}ч {minutes}м"
+                except Exception as e:
+                    # Если уж совсем мусор прилетел, покажем ошибку
+                    st.warning(f"Что-то не так с датой в задаче: {e}")
+            
+            if can_do:
+                c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+                c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
+                
+                if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
+                    db["balances"].loc[0, current_user] += int(row['reward'])
+                    db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
+                    db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+                    db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                    save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
+                    st.rerun()
+            else:
+                c1.write(f"~~{row['title']}~~")
+                c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
+                c2.button("⏳", key=f"t_{i}", disabled=True)
             
         if st.button("Создать"):
             if not title:
