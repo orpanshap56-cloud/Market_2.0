@@ -73,7 +73,13 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("---")
-    if st.button("🔄 Синхронизировать", use
+    if st.button("🔄 Синхронизировать", use_container_width=True): 
+        sync_database()
+        st.rerun()
+        
+    if st.button("🚪 Выйти", use_container_width=True):
+        st.session_state.user = None
+        st.rerun()
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
