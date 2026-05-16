@@ -168,7 +168,7 @@ if st.session_state.page == "tasks":
               c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
             c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
                 
-                if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
+            if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
                     db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
