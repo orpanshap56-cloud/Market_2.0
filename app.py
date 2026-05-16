@@ -330,7 +330,7 @@ for j, row in db["market"].iterrows():
                 st.rerun()
     
     with st.expander("🏷️ Выставить лот на продажу"):
-        with st.form("new_market_form", clear_on_submit=True):
+       with st.form("new_market_form", clear_on_submit=True):
             m_title = st.text_input("Что продаем / На что копим?")
             m_price = st.number_input("Цена или Цель (🪙)", min_value=1, value=50)
             m_type = st.selectbox("Тип лота", ["Индивидуальный", "Общий"])
