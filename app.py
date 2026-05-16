@@ -3,41 +3,27 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ И СТИЛЬ ПАНЕЛИ ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ И СТИЛИЗАЦИЯ "ШТОРКИ" ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
-# Чистый CSS без "приклеивания" всего подряд
 st.markdown("""
     <style>
-        /* Прячем стандартные элементы */
+        /* Прячем стандартный сайдбар и хедер */
         [data-testid="stSidebar"] {display: none;}
         [data-testid="stHeader"] {display: none;}
-        .block-container {padding-top: 1rem !important;}
-
-        /* Стилизуем нашу серую панель */
-        .st-emotion-cache-12fmjuu { /* Контейнер кнопок */
-            background-color: #f0f2f6;
-            padding: 15px;
-            border-radius: 15px;
-            border: 1px solid #d1d5db;
+        
+        /* Стилизуем экспандер под серую панель-шторку */
+        .st_details_container, .st-emotion-cache-p5msec {
+            background-color: #f0f2f6 !important;
+            border-radius: 10px !important;
+            border: 1px solid #d1d5db !important;
         }
         
-        /* Делаем верхнюю панель фиксированной */
-        [data-testid="stVerticalBlockBorderWrapper"] > div:first-child {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: #f0f2f6;
-            z-index: 999999;
-            padding: 10px 5% 15px 5%;
-            border-bottom: 2px solid #d1d5db;
-        }
-
-        /* Отступ основного контента, чтобы он не прятался */
-        .main-content-spacer {
-            margin-top: 170px;
-        }
+        /* Убираем лишние отступы сверху */
+        .block-container {padding-top: 1rem !important;}
+        
+        /* Делаем текст внутри шторки компактнее */
+        .stMarkdown p { margin-bottom: 5px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,28 +67,29 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-# --- ОТРИСОВКА ФИКСИРОВАННОЙ СЕРОЙ ПАНЕЛИ ---
-# Этот блок всегда первый и всегда серый
-top_placeholder = st.empty()
-with st.container():
-    # Строка 1: Инфо
-    inf1, inf2, inf3 = st.columns([1.5, 2, 0.5])
-    inf1.write(f"👤 **{DISPLAY[current_user]}**")
-    inf2.write(f"💰 **{my_balance}** | 💖 **{my_rating}**")
-    if inf3.button("🚪", key="exit_key"):
+# --- ВЫДВИЖНАЯ СЕРАЯ ПАНЕЛЬ СВЕРХУ ---
+# В заголовке сразу виден баланс, чтобы не открывать лишний раз
+with st.expander(f"👤 {DISPLAY[current_user]} | 💰 {my_balance} | 💖 {my_rating}", expanded=False):
+    
+    # Кнопки навигации в ряд
+    nav_cols = st.columns(3)
+    if nav_cols[0].button("📋 Задачи", use_container_width=True, key="nav_t"):
+        st.session_state.page = "tasks"; st.rerun()
+    if nav_cols[1].button("🛒 Маркет", use_container_width=True, key="nav_m"):
+        st.session_state.page = "market"; st.rerun()
+    if nav_cols[2].button("👤 Профиль", use_container_width=True, key="nav_p"):
+        st.session_state.page = "profile"; st.rerun()
+    
+    st.markdown("---")
+    
+    # Доп. функции
+    c1, c2 = st.columns([3, 1])
+    if c1.button("🔄 Синхронизировать данные", use_container_width=True):
+        sync_database(); st.rerun()
+    if c2.button("🚪 Выход", use_container_width=True):
         st.session_state.user = None; st.rerun()
 
-    # Строка 2: Навигация
-    nav1, nav2, nav3 = st.columns(3)
-    if nav1.button("📋 Задачи", use_container_width=True, key="n_tasks"):
-        st.session_state.page = "tasks"; st.rerun()
-    if nav2.button("🛒 Маркет", use_container_width=True, key="n_market"):
-        st.session_state.page = "market"; st.rerun()
-    if nav3.button("👤 Инфо", use_container_width=True, key="n_profile"):
-        st.session_state.page = "profile"; st.rerun()
-
-# Создаем физический отступ
-st.markdown('<div class="main-content-spacer"></div>', unsafe_allow_html=True)
+st.markdown("---") # Визуальная линия под панелью
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
