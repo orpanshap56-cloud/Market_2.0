@@ -8,31 +8,35 @@ st.set_page_config(page_title="Семейная Экономика", page_icon="
 
 st.markdown("""
     <style>
-        /* Прячем стандартный мусор */
+        /* Прячем стандартные элементы Streamlit */
         [data-testid="stSidebar"] {display: none;}
         [data-testid="stHeader"] {display: none;}
         
-        /* ГЛАВНЫЙ ХАК: Фиксируем ПЕРВЫЙ вертикальный блок на странице */
-        /* Мы выбираем контейнер, в котором лежат наши кнопки навигации */
+        /* Фиксируем ПЕРВЫЙ блок (нашу панель) */
         div[data-testid="stVerticalBlock"] > div:first-child {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            background-color: white;
+            background-color: #f0f2f6; /* Светло-серый цвет (фирменный стиль Streamlit) */
             z-index: 999999;
-            padding: 10px 10% 20px 10%; /* Отступы по бокам, чтобы на ПК не растягивалось в край */
-            border-bottom: 2px solid #f0f2f6;
+            padding: 10px 10% 20px 10%;
+            border-bottom: 2px solid #d1d5db; /* Чуть более темная граница снизу */
         }
 
-        /* Делаем отступ для всего остального контента, чтобы он вылез из-под панели */
+        /* Отступ для контента */
         div[data-testid="stVerticalBlock"] > div:nth-child(2) {
             margin-top: 180px !important;
         }
         
-        /* Убираем лишние отступы у самой страницы */
         .block-container {
             padding-top: 0rem !important;
+        }
+
+        /* Чтобы кнопки на сером фоне выглядели четче */
+        div[data-testid="stVerticalBlock"] > div:first-child .stButton button {
+            background-color: white;
+            border: 1px solid #d1d5db;
         }
     </style>
 """, unsafe_allow_html=True)
