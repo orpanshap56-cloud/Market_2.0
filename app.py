@@ -3,8 +3,31 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ И СТАТИЧНОЕ МЕНЮ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
+
+# CSS для фиксации верхней панели
+st.markdown("""
+    <style>
+        /* Фиксируем верхний контейнер */
+        div[data-testid="stVerticalBlock"] > div:has(div.nav-container) {
+            position: fixed;
+            top: 2.8rem;
+            background-color: white;
+            z-index: 999;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        /* Отступ для основного контента, чтобы он не заезжал под панель */
+        .main-content {
+            margin-top: 130px;
+        }
+        /* Скрываем стандартный сайдбар полностью */
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -26,13 +49,9 @@ if "db" not in st.session_state: sync_database()
 if "user" not in st.session_state: st.session_state.user = None
 if "page" not in st.session_state: st.session_state.page = "tasks"
 
-# --- ПОДГОТОВКА ДАННЫХ ИЗ КЭША ---
-if "db" not in st.session_state: sync_database()
 db = st.session_state.db 
-
 h_name = db["balances"].loc[0, "Муж_Имя"] if "Муж_Имя" in db["balances"].columns else "Муж"
 w_name = db["balances"].loc[0, "Жена_Имя"] if "Жена_Имя" in db["balances"].columns else "Жена"
-
 DISPLAY = {"Муж": h_name, "Жена": w_name, "Оба": "Оба"}
 
 # --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
@@ -48,48 +67,33 @@ if st.session_state.user is None:
     st.stop()
 
 current_user = st.session_state.user
-partner = "Жена" if current_user == "Муж" else "Муж"
-
 my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
-
-# --- САЙДБАР (Теперь только инфо и выход) ---
-with st.sidebar:
-    st.title(f"{DISPLAY[current_user]}")
-    st.metric("Кошелек", f"{my_balance} 🪙")
-    st.metric("Рейтинг", f"{my_rating} 💖")
-    
-    st.markdown("---")
-    if st.button("🔄 Синхронизировать", use_container_width=True): 
-        sync_database()
-        st.rerun()
-        
-    st.markdown("---")
-    if st.button("🚪 Выход", use_container_width=True):
-        st.session_state.user = None
-        st.rerun()
-
 now = datetime.now()
 
-# --- ВЕРХНЯЯ НАВИГАЦИЯ (Идеально для мобилок и ПК) ---
+# --- ФИКСИРОВАННАЯ ВЕРХНЯЯ ПАНЕЛЬ ---
+# Оборачиваем в div с классом nav-container для CSS
+st.markdown('<div class="nav-container"></div>', unsafe_allow_html=True)
+
+# Верхняя строка: Имя и Баланс
+info_col1, info_col2, info_col3 = st.columns([2, 2, 1])
+info_col1.caption(f"👤 {DISPLAY[current_user]}")
+info_col2.caption(f"💰 {my_balance} | 💖 {my_rating}")
+if info_col3.button("🚪", help="Выйти"):
+    st.session_state.user = None
+    st.rerun()
+
+# Нижняя строка: Кнопки навигации
 nav_cols = st.columns(3)
-
 if nav_cols[0].button("📋 Задачи", use_container_width=True):
-    if st.session_state.page != "tasks":
-        st.session_state.page = "tasks"
-        st.rerun()
-            
+    st.session_state.page = "tasks"; st.rerun()
 if nav_cols[1].button("🛒 Маркет", use_container_width=True):
-    if st.session_state.page != "market":
-        st.session_state.page = "market"
-        st.rerun()
-            
-if nav_cols[2].button("👤 Профиль", use_container_width=True):
-    if st.session_state.page != "profile":
-        st.session_state.page = "profile"
-        st.rerun()
+    st.session_state.page = "market"; st.rerun()
+if nav_cols[2].button("👤 Инфо", use_container_width=True):
+    st.session_state.page = "profile"; st.rerun()
 
-st.markdown("---")
+# Контейнер-отступ, чтобы контент не прятался под панелью
+st.markdown('<div class="main-content"></div>', unsafe_allow_html=True)
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
