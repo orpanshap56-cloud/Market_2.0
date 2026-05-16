@@ -91,6 +91,7 @@ if st.session_state.page == "tasks":
                 new_task = {
                     "title": clean_title,  # <-- И сохраняем уже чистый текст
                     "reward": reward, 
+                }
                     # ... остальное без изменений
         title = st.text_input("Что сделать?")
         reward = st.number_input("Награда", min_value=1, value=10)
