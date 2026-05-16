@@ -16,7 +16,7 @@ def sync_database():
         "tasks": get_data("tasks"),
         "market": get_data("market"),
         "history": get_data("history"),
-        "templates": get_data("templates") # Подключили новую вкладку шаблонов
+        "templates": get_data("templates")
     }
 
 if "db" not in st.session_state: sync_database()
@@ -86,11 +86,10 @@ now = datetime.now()
 if st.session_state.page == "tasks":
     st.title("✅ Задачи")
 
-    # --- БЛОК 1: ДОБАВЛЕНИЕ ЗАДАЧИ (С ШАБЛОНАМИ) ---
+    # --- БЛОК 1: ДОБАВЛЕНИЕ ЗАДАЧИ ---
     with st.expander("➕ Добавить новую задачу"):
         template_df = db.get("templates", pd.DataFrame(columns=["title", "reward"]))
         
-        # Собираем список шаблонов для выпадающего меню
         template_options = ["Без шаблона (Свой вариант)"]
         if not template_df.empty:
             for idx, t_row in template_df.iterrows():
@@ -98,7 +97,6 @@ if st.session_state.page == "tasks":
                 
         selected_template = st.selectbox("Выбрать из готовых шаблонов", template_options)
         
-        # Подставляем значения в зависимости от выбора
         default_title = ""
         default_reward = 10
         if selected_template != "Без шаблона (Свой вариант)":
@@ -106,9 +104,11 @@ if st.session_state.page == "tasks":
             default_title = str(template_df.iloc[sel_idx]['title'])
             default_reward = int(template_df.iloc[sel_idx]['reward'])
             
-        # Используем динамический key, чтобы поля мгновенно обновлялись при смене шаблона
         title = st.text_input("Что сделать?", value=default_title, key=f"title_input_{selected_template}")
         reward = st.number_input("Награда (🪙)", min_value=1, value=default_reward, key=f"reward_input_{selected_template}")
+        
+        # НОВОЕ ПОЛЕ ДЛЯ КОММЕНТАРИЯ
+        task_comment = st.text_area("Комментарий / Уточнения (необязательно)", key=f"comment_{selected_template}")
         
         assignee = st.selectbox("Кто выполняет?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
         t_type = st.radio("Режим задачи", ["Разовая", "Интервальная"])
@@ -127,6 +127,7 @@ if st.session_state.page == "tasks":
                 new_task = {
                     "title": clean_title,
                     "reward": reward,
+                    "comment": task_comment.strip(), # Сохраняем комментарий
                     "assigned_to": assignee,
                     "task_type": t_type,
                     "interval_value": val,
@@ -165,6 +166,8 @@ if st.session_state.page == "tasks":
         
         raw_creator = row.get('created_by')
         creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
+        
+        raw_comment = row.get('comment', '') # Достаем комментарий
         
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
@@ -210,6 +213,9 @@ if st.session_state.page == "tasks":
             
             if can_do:
                 c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
+                # Если есть комментарий - выводим
+                if pd.notna(raw_comment) and str(raw_comment).strip() != "":
+                    c1.caption(f"💬 *{str(raw_comment).strip()}*")
                 c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
                 
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
@@ -232,11 +238,15 @@ if st.session_state.page == "tasks":
                     st.rerun()
             else:
                 c1.write(f"~~{str(row['title']).strip()}~~")
+                if pd.notna(raw_comment) and str(raw_comment).strip() != "":
+                    c1.caption(f"💬 *{str(raw_comment).strip()}*")
                 c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
                 c2.button("⏳", key=f"t_{i}", disabled=True)
 
         else: # РАЗОВАЯ
             c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
+            if pd.notna(raw_comment) and str(raw_comment).strip() != "":
+                c1.caption(f"💬 *{str(raw_comment).strip()}*")
             c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
