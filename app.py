@@ -492,6 +492,30 @@ elif st.session_state.page == "profile":
     if not stakhanov_unlocked:
         stakhanov_unlocked = (hist_df[(hist_df["type"] == "Работа") & (hist_df["buyer"] == current_user)].shape[0] >= 10) if not hist_df.empty else False
 
+    teamwork_unlocked = "teamwork" in my_forever_achievements
+    if not teamwork_unlocked:
+        # Проверяем, есть ли в маркете или в истории создания лотов запись, где продавец — "Оба"
+        has_joint_lot = market_df[market_df["seller"] == "Оба"].shape[0] > 0 if not market_df.empty else False
+        teamwork_unlocked = has_joint_lot
+
+    consumer_unlocked = "consumer" in my_forever_achievements
+    if not consumer_unlocked:
+        consumer_unlocked = (hist_df[(hist_df["type"] == "Покупка") & (hist_df["buyer"] == current_user)].shape[0] >= 1) if not hist_df.empty else False
+
+    habit_unlocked = "habit" in my_forever_achievements
+    if not habit_unlocked:
+        if not hist_df.empty:
+            # Считаем количество выполнений для каждой задачи (тип "Работа")
+            work_history = hist_df[(hist_df["type"] == "Работа") & (hist_df["buyer"] == current_user)]
+            if not work_history.empty:
+                # Группируем по названию задачи и смотрим максимальное количество
+                max_repeats = work_history["item"].value_counts().max()
+                habit_unlocked = max_repeats >= 10
+            else:
+                habit_unlocked = False
+        else:
+            habit_unlocked = False
+
     # Массив для фиксации новых открытий прямо сейчас
     newly_unlocked = []
     
@@ -502,6 +526,9 @@ elif st.session_state.page == "profile":
         "templates": templates_unlocked,
         "bazar": bazar_unlocked,
         "stakhanov": stakhanov_unlocked
+        "teamwork": teamwork_unlocked,  
+        "consumer": consumer_unlocked,  
+        "habit": habit_unlocked         
     }
     
     for ach_id, is_met in conditions.items():
