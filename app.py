@@ -174,7 +174,7 @@ for i, row in db["tasks"].iterrows():
 # ЭКРАН: МАРКЕТПЛЕЙС
 # ==========================================
 elif st.session_state.page == "market":
-     st.title("🛒 Маркетплейс")
+    st.title("🛒 Маркетплейс")
     
     for j, row in db["market"].iterrows():
         # Те же три колонки: описание, кнопка покупки и корзина
