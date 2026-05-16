@@ -158,14 +158,12 @@ if st.session_state.page == "tasks":
     st.markdown("---")
 
 # --- ПАТЧ: СОРТИРОВКА ЗАДАЧ ---
-    # Создаем временный список для сортировки
     sorted_tasks = []
     
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         can_do_now = True
         
-        # Проверяем доступность интервальной задачи
         if t_type == "Интервальная":
             raw_last_done = row.get('last_completed')
             val = int(row.get('interval_value', 0))
@@ -183,26 +181,22 @@ if st.session_state.page == "tasks":
                 except:
                     pass
         
-        # Запоминаем индекс, саму строку и статус доступности
         sorted_tasks.append({'index': i, 'row': row, 'available': can_do_now})
 
-    # Сортируем: сначала те, где available == True
+    # Сортируем: сначала доступные (True), потом недоступные (False)
     sorted_tasks = sorted(sorted_tasks, key=lambda x: x['available'], reverse=True)
 
-    # ТЕПЕРЬ ЗАПУСКАЕМ ЦИКЛ ПО ОТСОРТИРОВАННОМУ СПИСКУ
+    # ЕДИНЫЙ ЦИКЛ ОТРИСОВКИ
     for task_item in sorted_tasks:
         i = task_item['index']
         row = task_item['row']
-        # --- (Далее идет твой существующий код отрисовки карточки) ---
-    
-    for i, row in db["tasks"].iterrows():
+        
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
         
         raw_creator = row.get('created_by')
         creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
         
-        # Лечим проблему отображения 'nan' в комментариях
         raw_comment = str(row.get('comment', ''))
         if raw_comment.lower() in ['nan', 'none', '']:
             raw_comment = ""
@@ -210,58 +204,41 @@ if st.session_state.page == "tasks":
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
         
-        # --- 1. ЛОГИКА РАСЧЕТА ВРЕМЕНИ (ВОЗВРАЩАЕМ ПЕРЕМЕННЫЕ) ---
-        can_do = True
+        # Повторно вычисляем переменные времени для конкретной карточки
+        can_do = task_item['available']
         time_text = ""
         
-        if t_type == "Интервальная":
-            raw_last_done = row.get('last_completed')
-            val = int(row.get('interval_value', 0))
-            unit = row.get('interval_unit', 'Часы')
-            
-            if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
-                try:
-                    last_done_dt = pd.to_datetime(str(raw_last_done))
-                    if last_done_dt.tzinfo is not None:
-                        last_done_dt = last_done_dt.tz_localize(None)
-                        
-                    if unit == "Часы":
-                        next_available = last_done_dt + timedelta(hours=val)
-                    else:
-                        next_available = last_done_dt + timedelta(days=val)
-                    
-                    if now < next_available:
-                        can_do = False
-                        diff = next_available - now
-                        if diff.days > 0:
-                            time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
-                        else:
-                            hours, remainder = divmod(diff.seconds, 3600)
-                            minutes, _ = divmod(remainder, 60)
-                            time_text = f"⏳ Доступно через {hours}ч {minutes}м"
-                except Exception as e:
-                    can_do = False
-                    time_text = f"⚠️ Ошибка даты"
+        if not can_do and t_type == "Интервальная":
+            try:
+                last_done_dt = pd.to_datetime(str(row.get('last_completed')))
+                if last_done_dt.tzinfo is not None: last_done_dt = last_done_dt.tz_localize(None)
+                val = int(row.get('interval_value', 0))
+                unit = row.get('interval_unit', 'Часы')
+                delta = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
+                diff = (last_done_dt + delta) - now
+                if diff.days > 0:
+                    time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+                else:
+                    hours, remainder = divmod(diff.seconds, 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    time_text = f"⏳ Доступно через {hours}ч {minutes}м"
+            except:
+                time_text = "⏳ Ожидание..."
 
-        # --- 2. ОПТИМИЗИРОВАННЫЙ ВЫВОД (ПК + МОБИЛКА) ---
-        with st.container(border=True): # Каждая задача в своей "карточке"
+        # --- КАРТОЧКА ЗАДАЧИ ---
+        with st.container(border=True):
             head_col, del_col = st.columns([5, 0.5])
-            
-            # Заголовок и удаление
             head_col.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
-            if del_col.button("🗑️", key=f"del_t_{i}", help="Удалить"):
+            if del_col.button("🗑️", key=f"del_t_{i}"):
                 db["tasks"] = db["tasks"].drop(i)
                 save_data("tasks", db["tasks"])
                 st.rerun()
 
-            # Комментарий
             if raw_comment:
                 st.caption(f"💬 *{raw_comment}*")
             
-            # Инфо-строка
             st.caption(f"✍️ {creator_label} ➔ 🎯 {assignee_label}")
 
-            # Кнопка действия
             btn_col, status_col = st.columns([1, 1])
 
             if t_type == "Интервальная":
@@ -270,7 +247,6 @@ if st.session_state.page == "tasks":
                         db["balances"].loc[0, current_user] += int(row['reward'])
                         db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
                         db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
-                        
                         current_time = now.strftime("%d.%m.%Y %H:%M")
                         new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                         db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
@@ -279,12 +255,10 @@ if st.session_state.page == "tasks":
                 else:
                     status_col.write(f"{time_text}")
                     btn_col.button("⏳", key=f"t_{i}", disabled=True, use_container_width=True)
-            
-            else: # РАЗОВАЯ
+            else:
                 if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
                     db["balances"].loc[0, current_user] += int(row['reward'])
                     db["tasks"] = db["tasks"].drop(i)
-                    
                     current_time = now.strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
