@@ -75,20 +75,24 @@ with st.sidebar:
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
-if st.session_state.page == "tasks":
-    st.header("📋 Твои задачи")
-    now = datetime.now()
+for i, row in db["tasks"].iterrows():
+        t_type = row.get('task_type', 'Разовая')
+        is_my = row['assigned_to'] in [current_user, "Оба"]
+        
+        raw_creator = row.get('created_by')
+        creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
+        
+        assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
+        creator_label = DISPLAY.get(creator, creator)
+        
+        # Вот эта строчка потерялась! Она создает колонки:
+        c1, c2, c3 = st.columns([3, 1, 0.5])
+        
+        if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
+            db["tasks"] = db["tasks"].drop(i)
+            save_data("tasks", db["tasks"])
+            st.rerun()
 
-    # --- ФОРМА СОЗДАНИЯ ---
-    with st.expander("➕ Добавить задачу"):
-        
-        title = st.text_input("Что сделать?", key="new_task_title_input") 
-        reward = st.number_input("Награда", min_value=1, value=10)
-        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
-        t_type = st.radio("Режим", ["Разовая", "Интервальная"])
-        
-        val, unit = 0, ""
-        
         if t_type == "Интервальная":
             raw_last_done = row.get('last_completed')
             val = int(row.get('interval_value', 0))
@@ -128,11 +132,11 @@ if st.session_state.page == "tasks":
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
                     
-                    # Для интервальной задачи обновляем время, а НЕ удаляем
+                    # Для интервальной задачи обновляем время
                     db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
             
-                    # Добавляем текущую дату и время в историю (строго внутри кнопки!)
+                    # Добавляем текущую дату и время в историю
                     current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{
                         "date": current_time, 
