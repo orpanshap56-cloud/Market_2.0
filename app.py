@@ -252,44 +252,82 @@ if st.session_state.page == "tasks":
 # ==========================================
 # ЭКРАН: МАРКЕТПЛЕЙС
 # ==========================================
-elif st.session_state.page == "market":
-    st.title("🛒 Маркетплейс")
-    
-    for j, row in db["market"].iterrows():
-        c1, c2, c3 = st.columns([3, 1, 0.5])
+for j, row in db["market"].iterrows():
+        # Подготовка данных лота
+        l_type = row.get('type', 'Индивидуальный')
         price = int(row['price'])
-        is_my_item = (row['seller'] == current_user)
-        can_buy = (not is_my_item) and (my_balance >= price)
-        btn_label = "Мой лот" if is_my_item else "Купить"
+        collected = int(row.get('collected', 0)) if pd.notna(row.get('collected')) else 0
+        contribs = str(row.get('contributions', ''))
         
-        if c3.button("🗑️", key=f"del_m_{j}", help="Удалить лот с витрины"):
+        c1, c2, c3 = st.columns([3, 1.2, 0.5])
+        
+        # Кнопка удаления (оставляем)
+        if c3.button("🗑️", key=f"del_m_{j}"):
             db["market"] = db["market"].drop(j)
             save_data("market", db["market"])
             st.rerun()
-        
-        if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
-            db["balances"].loc[0, current_user] -= price
-            if row['seller'] != "Оба":
-                partner_key = f"{row['seller']}_Рейтинг"
-                db["balances"].loc[0, partner_key] += price
+
+        if l_type == "Общий":
+            # --- ЛОГИКА ОБЩЕГО ЛОТА ---
+            progress = min(collected / price, 1.0)
+            c1.write(f"🤝 **{row['title']}**")
+            c1.progress(progress)
+            c1.caption(f"Накоплено: **{collected}** из **{price}** 🪙")
             
-            current_time = now.strftime("%d.%m.%Y %H:%M")
-            new_log = pd.DataFrame([{
-                "date": current_time,
-                "buyer": current_user, 
-                "item": row['title'], 
-                "price": price, 
-                "seller": row['seller'], 
-                "type": "Покупка"
-            }])
-            db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-            save_data("balances", db["balances"]); save_data("history", db["history"])
-            st.balloons()
-            st.rerun()
+            # Показываем, кто сколько внес (мелким шрифтом)
+            if contribs and contribs != "nan":
+                c1.markdown(f"<p style='font-size: 11px; color: gray;'>Вклады: {contribs}</p>", unsafe_allow_html=True)
             
-        display_name = f"🎁 **{row['title']}** ({price} 🪙)"
-        if is_my_item: display_name += " *(Ваше)*"
-        c1.write(display_name)
+            if collected < price:
+                # Поле для ввода суммы вклада
+                donate_amount = c2.number_input("Сумма", min_value=1, max_value=max(1, price - collected), value=min(10, price - collected), key=f"don_val_{j}")
+                if c2.button("Скинуться", key=f"don_btn_{j}", disabled=(my_balance < donate_amount)):
+                    # Обновляем баланс
+                    db["balances"].loc[0, current_user] -= donate_amount
+                    # Обновляем прогресс лота
+                    db["market"].at[j, 'collected'] = collected + donate_amount
+                    
+                    # Обновляем историю вкладов (строка формата "Имя: 10, Имя: 20")
+                    user_label = DISPLAY[current_user]
+                    new_contrib = f"{user_label}: {donate_amount}"
+                    old_contribs = contribs if (contribs and contribs != "nan") else ""
+                    db["market"].at[j, 'contributions'] = f"{old_contribs}, {new_contrib}".strip(", ")
+                    
+                    # Логируем в историю
+                    current_time = now.strftime("%d.%m.%Y %H:%M")
+                    new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": f"Вклад в: {row['title']}", "price": donate_amount, "seller": "Общак", "type": "Покупка"}])
+                    db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                    
+                    save_data("balances", db["balances"]); save_data("market", db["market"]); save_data("history", db["history"])
+                    st.rerun()
+            else:
+                c2.success("Цель достигнута! 🎉")
+                if c2.button("Закрыть цель", key=f"close_target_{j}"):
+                    db["market"] = db["market"].drop(j)
+                    save_data("market", db["market"])
+                    st.rerun()
+
+        else:
+            # --- ЛОГИКА ИНДИВИДУАЛЬНОГО ЛОТА ---
+            is_my_item = (row['seller'] == current_user)
+            can_buy = (not is_my_item) and (my_balance >= price)
+            btn_label = "Мой лот" if is_my_item else f"Купить"
+            
+            c1.write(f"🎁 **{row['title']}** ({price} 🪙)")
+            if is_my_item: c1.caption("*(Ваше на витрине)*")
+            
+            if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
+                db["balances"].loc[0, current_user] -= price
+                if row['seller'] != "Оба":
+                    partner_key = f"{row['seller']}_Рейтинг"
+                    db["balances"].loc[0, partner_key] += price
+                
+                current_time = now.strftime("%d.%m.%Y %H:%M")
+                new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
+                db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                save_data("balances", db["balances"]); save_data("history", db["history"])
+                st.balloons()
+                st.rerun()
     
     with st.expander("🏷️ Выставить лот на продажу"):
         with st.form("new_market_form", clear_on_submit=True):
