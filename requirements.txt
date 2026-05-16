@@ -1,3 +1,4 @@
 streamlit
 st-theme
 st-gsheets-connection
+requests
