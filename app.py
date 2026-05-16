@@ -152,9 +152,9 @@ with st.sidebar:
 if st.session_state.page == "tasks":
     st.title("✅ Задачи")
 
+    # --- БЛОК ДОБАВЛЕНИЯ ЗАДАЧИ ---
     with st.expander("➕ Добавить новую задачу"):
         template_df = db.get("templates", pd.DataFrame(columns=["title", "reward"]))
-        
         template_options = ["Без шаблона (Свой вариант)"]
         if not template_df.empty:
             for idx, t_row in template_df.iterrows():
@@ -170,10 +170,8 @@ if st.session_state.page == "tasks":
             default_reward = int(template_df.iloc[sel_idx]['reward'])
             
         title = st.text_input("Что сделать?", value=default_title, key=f"title_input_{selected_template}")
-        reward = st.number_input("Награда (🪙)", min_value=1, value=default_reward, key=f"reward_input_{selected_template}")
-        
-        task_comment = st.text_area("Комментарий / Уточнения (необязательно)", key=f"comment_{selected_template}")
-        
+        reward = st.number_input("Награда (🪙)", min_value=1, value=default_reward)
+        task_comment = st.text_area("Комментарий / Уточнения (необязательно)")
         assignee = st.selectbox("Кто выполняет?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
         t_type = st.radio("Режим задачи", ["Разовая", "Интервальная"])
         
@@ -199,197 +197,136 @@ if st.session_state.page == "tasks":
                     "last_completed": "",
                     "created_by": current_user
                 }
-                
-                # Сохраняем
                 db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
                 save_data("tasks", db["tasks"])
                 
-                # 🔥 Сначала отправляем уведомление, потом РЕРАН
-                # Определяем ник для ТГ прямо здесь
+                # Уведомление ПЕРЕД рераном
                 t_label = DISPLAY.get(assignee, assignee)
                 send_telegram(f"🔔 Новая задача: {clean_title} ({reward} 🪙) для {t_label}!", target=assignee)
                 
                 st.success(f"Задача '{clean_title}' добавлена!")
-                st.rerun() # Теперь реран в самом конце
-                
+                st.rerun()
+
+    # --- НАСТРОЙКА ШАБЛОНОВ ---
     with st.expander("✨ Настройка шаблонов (Управление ценами)"):
-        st.write("Создай постоянный тариф для частых задач, чтобы цена не путалась.")
         with st.form("new_template_form", clear_on_submit=True):
-            tpl_title = st.text_input("Название шаблона (например, Помыть посуду)")
+            tpl_title = st.text_input("Название шаблона")
             tpl_reward = st.number_input("Фиксированная награда (🪙)", min_value=1, value=5)
-            
             if st.form_submit_button("Сохранить этот шаблон"):
                 if tpl_title.strip():
                     new_tpl = {"title": tpl_title.strip(), "reward": int(tpl_reward)}
                     db["templates"] = pd.concat([db["templates"], pd.DataFrame([new_tpl])], ignore_index=True)
                     save_data("templates", db["templates"])
-                    st.success(f"Шаблон '{tpl_title}' успешно сохранен!")
+                    st.success("Шаблон сохранен!")
                     st.rerun()
-                else:
-                    st.warning("Введи название для шаблона!")
 
     st.markdown("---")
 
-# ==========================================
-# ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ
-# ==========================================
-    st.subheader("🔍 Фильтры и поиск")
-    
-    # Делаем три колонки для фильтров
-    c_f1, c_f2, c_f3 = st.columns(3)
-    
-    f_assignee = c_f1.selectbox(
-        "Для кого?", 
-        ["Все", "Муж", "Жена", "Оба"], 
-        format_func=lambda x: DISPLAY.get(x, x)
-    )
-    
-    f_type = c_f2.selectbox(
-        "Тип задачи", 
-        ["Все", "Разовые", "Интервальные"]
-    )
-    
-    f_sort = c_f3.selectbox(
-        "Награда", 
-        ["По умолчанию", "Сначала дорогие", "Сначала дешевые"]
-    )
+    # --- ПАНЕЛЬ ФИЛЬТРОВ ---
+    st.subheader("🔍 Фильтры")
+    cf1, cf2, cf3 = st.columns(3)
+    f_assignee = cf1.selectbox("Для кого?", ["Все", "Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+    f_type = cf2.selectbox("Тип задачи", ["Все", "Разовые", "Интервальные"])
+    f_sort = cf3.selectbox("Сортировка", ["По умолчанию", "Дорогие", "Дешевые"])
 
-   # Копируем данные для фильтрации
-    df_filtered = db["tasks"].copy()
+    # Готовим данные для фильтрации
+    df_f = db["tasks"].copy()
 
-    # 1. Фильтр по исполнителю (УМНЫЙ)
+    # Умный фильтр по исполнителю
     if f_assignee != "Все":
         if f_assignee in ["Муж", "Жена"]:
-            # Если выбран Муж, показываем Муж + Оба
-            df_filtered = df_filtered[df_filtered["assigned_to"].isin([f_assignee, "Оба"])]
+            df_f = df_f[df_f["assigned_to"].isin([f_assignee, "Оба"])]
         else:
-            # Если выбрано "Оба", показываем только общие
-            df_filtered = df_filtered[df_filtered["assigned_to"] == "Оба"]
+            df_f = df_f[df_f["assigned_to"] == "Оба"]
 
-    # 2. Фильтр по типу
+    # Фильтр по типу
     if f_type != "Все":
-        target_type = "Разовая" if f_type == "Разовые" else "Интервальная"
-        df_filtered = df_filtered[df_filtered["task_type"] == target_type]
+        df_f = df_f[df_f["task_type"] == ("Разовая" if f_type == "Разовые" else "Интервальная")]
 
-    # 3. Сортировка по цене
-    if f_sort == "Сначала дорогие":
-        df_filtered = df_filtered.sort_values(by="reward", ascending=False)
-    elif f_sort == "Сначала дешевые":
-        df_filtered = df_filtered.sort_values(by="reward", ascending=True)
+    # Сортировка по награде
+    if f_sort == "Дорогие":
+        df_f = df_f.sort_values(by="reward", ascending=False)
+    elif f_sort == "Дешевые":
+        df_f = df_f.sort_values(by="reward", ascending=True)
 
-    # --- ПАТЧ: ПРОВЕРКА ДОСТУПНОСТИ И СОРТИРОВКА (ДОСТУПНЫЕ ВВЕРХУ) ---
-    sorted_tasks = []
-    
-    for i, row in df_filtered.iterrows():
-        t_type = row.get('task_type', 'Разовая')
-        can_do_now = True
-        
-        if t_type == "Интервальная":
-            raw_last_done = row.get('last_completed')
-            val = int(row.get('interval_value', 0))
-            unit = row.get('interval_unit', 'Часы')
-            
-            if pd.notna(raw_last_done) and str(raw_last_done).strip() not in ["", "nan"]:
+    # СБРАСЫВАЕМ ИНДЕКСЫ (Критически важно для работы цикла!)
+    df_f = df_f.reset_index(drop=True)
+
+    # Предварительный расчет доступности для сортировки "Сначала готовые"
+    final_list = []
+    for idx, row in df_f.iterrows():
+        can_do = True
+        if row['task_type'] == "Интервальная":
+            raw_last = row.get('last_completed')
+            if pd.notna(raw_last) and str(raw_last).strip() not in ["", "nan"]:
                 try:
-                    last_done_dt = pd.to_datetime(str(raw_last_done))
-                    if last_done_dt.tzinfo is not None:
-                        last_done_dt = last_done_dt.tz_localize(None)
-                    
-                    delta = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
-                    if now < (last_done_dt + delta):
-                        can_do_now = False
-                except:
-                    pass
-        
-        sorted_tasks.append({'index': i, 'row': row, 'available': can_do_now})
+                    last_dt = pd.to_datetime(str(raw_last)).tz_localize(None)
+                    delta = timedelta(hours=int(row['interval_value'])) if row['interval_unit'] == "Часы" else timedelta(days=int(row['interval_value']))
+                    if now < (last_dt + delta):
+                        can_do = False
+                except: pass
+        final_list.append({"row": row, "available": can_do, "orig_idx": idx})
 
-    # Сортируем: сначала доступные. 
-    # Python sorted стабилен, поэтому порядок по цене сохранится внутри групп доступности.
-    sorted_tasks = sorted(sorted_tasks, key=lambda x: x['available'], reverse=True)
+    # Сортировка: доступные вперед
+    final_list = sorted(final_list, key=lambda x: x['available'], reverse=True)
 
-    # --- ЕДИНЫЙ ЦИКЛ ОТРИСОВКИ ---
-    if not sorted_tasks:
-        st.info("Задач с такими фильтрами не найдено. Попробуй сбросить фильтры!")
+    # --- ОТРИСОВКА КАРТОЧЕК ---
+    if not final_list:
+        st.info("Задач нет. Попробуй изменить фильтры!")
     else:
-        for task_item in sorted_tasks:
-            i = task_item['index']
-            row = task_item['row']
-        
-        t_type = row.get('task_type', 'Разовая')
-        is_my = row['assigned_to'] in [current_user, "Оба"]
-        
-        raw_creator = row.get('created_by')
-        creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
-        
-        raw_comment = str(row.get('comment', ''))
-        if raw_comment.lower() in ['nan', 'none', '']:
-            raw_comment = ""
+        for item in final_list:
+            row = item["row"]
+            idx = item["orig_idx"]
+            can_do = item["available"]
+            is_my = row['assigned_to'] in [current_user, "Оба"]
             
-        assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
-        creator_label = DISPLAY.get(creator, creator)
-        
-        # Повторно вычисляем переменные времени для конкретной карточки
-        can_do = task_item['available']
-        time_text = ""
-        
-        if not can_do and t_type == "Интервальная":
-            try:
-                last_done_dt = pd.to_datetime(str(row.get('last_completed')))
-                if last_done_dt.tzinfo is not None: last_done_dt = last_done_dt.tz_localize(None)
-                val = int(row.get('interval_value', 0))
-                unit = row.get('interval_unit', 'Часы')
-                delta = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
-                diff = (last_done_dt + delta) - now
-                if diff.days > 0:
-                    time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+            # Рендерим карточку
+            with st.container(border=True):
+                c1, c2 = st.columns([5, 0.5])
+                c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
+                if c2.button("🗑️", key=f"del_{idx}"):
+                    # Удаляем из ОСНОВНОЙ базы по индексу, который мы нашли через title (самый безопасный способ здесь)
+                    db["tasks"] = db["tasks"][db["tasks"]["title"] != row["title"]]
+                    save_data("tasks", db["tasks"])
+                    st.rerun()
+
+                if row.get('comment'): st.caption(f"💬 {row['comment']}")
+                
+                label_to = DISPLAY.get(row['assigned_to'], row['assigned_to'])
+                label_from = DISPLAY.get(row.get('created_by', 'Система'), row.get('created_by', 'Система'))
+                st.caption(f"✍️ {label_from} ➔ 🎯 {label_to}")
+
+                btn_c, status_c = st.columns([1, 1])
+                
+                if row['task_type'] == "Интервальная" and not can_do:
+                    # Считаем время до конца кулдауна
+                    last_dt = pd.to_datetime(str(row['last_completed'])).tz_localize(None)
+                    delta = timedelta(hours=int(row['interval_value'])) if row['interval_unit'] == "Часы" else timedelta(days=int(row['interval_value']))
+                    diff = (last_dt + delta) - now
+                    h, rem = divmod(diff.seconds, 3600)
+                    m, _ = divmod(rem, 60)
+                    status_c.write(f"⏳ {diff.days}д {h}ч {m}м")
+                    btn_c.button("⏳", key=f"wait_{idx}", disabled=True, use_container_width=True)
                 else:
-                    hours, remainder = divmod(diff.seconds, 3600)
-                    minutes, _ = divmod(remainder, 60)
-                    time_text = f"⏳ Доступно через {hours}ч {minutes}м"
-            except:
-                time_text = "⏳ Ожидание..."
-
-        # --- КАРТОЧКА ЗАДАЧИ ---
-        with st.container(border=True):
-            head_col, del_col = st.columns([5, 0.5])
-            head_col.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
-            if del_col.button("🗑️", key=f"del_t_{i}"):
-                db["tasks"] = db["tasks"].drop(i)
-                save_data("tasks", db["tasks"])
-                st.rerun()
-
-            if raw_comment:
-                st.caption(f"💬 *{raw_comment}*")
-            
-            st.caption(f"✍️ {creator_label} ➔ 🎯 {assignee_label}")
-
-            btn_col, status_col = st.columns([1, 1])
-
-            if t_type == "Интервальная":
-                if can_do:
-                    if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
+                    if btn_c.button("✅ Готово!", key=f"done_{idx}", disabled=not is_my, use_container_width=True):
+                        # Начисляем
                         db["balances"].loc[0, current_user] += int(row['reward'])
                         db["balances"].loc[0, f"{current_user}_Рейтинг"] += 10
-                        db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
-                        db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Логируем
                         current_time = now.strftime("%d.%m.%Y %H:%M")
                         new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                         db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                        
+                        if row['task_type'] == "Интервальная":
+                            # Находим задачу в основной базе по заголовку и обновляем время
+                            db["tasks"].loc[db["tasks"]["title"] == row["title"], "last_completed"] = now.strftime('%Y-%m-%d %H:%M:%S')
+                        else:
+                            # Удаляем разовую
+                            db["tasks"] = db["tasks"][db["tasks"]["title"] != row["title"]]
+                        
                         save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                         st.rerun()
-                else:
-                    status_col.write(f"{time_text}")
-                    btn_col.button("⏳", key=f"t_{i}", disabled=True, use_container_width=True)
-            else:
-                if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
-                    db["balances"].loc[0, current_user] += int(row['reward'])
-                    db["balances"].loc[0, f"{current_user}_Рейтинг"] += 10
-                    db["tasks"] = db["tasks"].drop(i)
-                    current_time = now.strftime("%d.%m.%Y %H:%M")
-                    new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
-                    db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                    save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-                    st.rerun()
                 
 # ==========================================
 # ЭКРАН: МАРКЕТПЛЕЙС
