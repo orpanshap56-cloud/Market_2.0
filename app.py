@@ -3,33 +3,36 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ И ФИКСИРОВАННЫЙ ХЕДЕР ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ И ЖЕСТКИЙ CSS ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
-# CSS для жесткой фиксации панели в самом верху
 st.markdown("""
     <style>
-        /* Прячем стандартный сайдбар и лишние отступы */
+        /* Прячем стандартный мусор */
         [data-testid="stSidebar"] {display: none;}
         [data-testid="stHeader"] {display: none;}
-        .block-container {padding-top: 0rem !important;}
-
-        /* Создаем фиксированный контейнер */
-        .fixed-header {
+        
+        /* ГЛАВНЫЙ ХАК: Фиксируем ПЕРВЫЙ вертикальный блок на странице */
+        /* Мы выбираем контейнер, в котором лежат наши кнопки навигации */
+        div[data-testid="stVerticalBlock"] > div:first-child {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             background-color: white;
-            z-index: 9999;
-            padding: 10px 20px;
+            z-index: 999999;
+            padding: 10px 10% 20px 10%; /* Отступы по бокам, чтобы на ПК не растягивалось в край */
             border-bottom: 2px solid #f0f2f6;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* Делаем отступ для всего остального контента, чтобы он вылез из-под панели */
+        div[data-testid="stVerticalBlock"] > div:nth-child(2) {
+            margin-top: 180px !important;
         }
         
-        /* Отступ для контента, чтобы он не уходил под шапку */
-        .main-content-padding {
-            margin-top: 150px;
+        /* Убираем лишние отступы у самой страницы */
+        .block-container {
+            padding-top: 0rem !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -74,21 +77,18 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-# --- ОТРИСОВКА ФИКСИРОВАННОЙ ПАНЕЛИ ---
-# Мы используем st.container с фиксацией через CSS выше
-header_container = st.container()
-with header_container:
-    # Обертка для фиксации через HTML-пустышку
-    st.markdown('<div class="fixed-header">', unsafe_allow_html=True)
-    
-    # Первая строка: Инфо
+# --- ОТРИСОВКА ПАНЕЛИ (ОНА ПЕРВАЯ В КОДЕ — ОНА И ЗАМРЕТ) ---
+# Важно: это должен быть самый первый UI-элемент после выбора профиля
+nav_container = st.container()
+with nav_container:
+    # Строка 1: Инфо
     c1, c2, c3 = st.columns([1.5, 2, 0.5])
     c1.write(f"👤 **{DISPLAY[current_user]}**")
     c2.write(f"💰 **{my_balance}** | 💖 **{my_rating}**")
     if c3.button("🚪", key="exit_btn"):
         st.session_state.user = None; st.rerun()
 
-    # Вторая строка: Навигация
+    # Строка 2: Кнопки
     n1, n2, n3 = st.columns(3)
     if n1.button("📋 Задачи", use_container_width=True, key="nav_tasks"):
         st.session_state.page = "tasks"; st.rerun()
@@ -96,11 +96,6 @@ with header_container:
         st.session_state.page = "market"; st.rerun()
     if n3.button("👤 Инфо", use_container_width=True, key="nav_profile"):
         st.session_state.page = "profile"; st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# Этот пустой блок создает отступ, чтобы основной контент не залез под шапку
-st.markdown('<div class="main-content-padding"></div>', unsafe_allow_html=True)
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
