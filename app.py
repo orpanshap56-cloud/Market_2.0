@@ -90,54 +90,6 @@ if st.session_state.page == "tasks":
         val, unit = 0, ""
         
         if t_type == "Интервальная":
-            c_val, c_unit = st.columns(2)
-            val = c_val.number_input("Интервал", min_value=1, value=12)
-            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
-            
-        if st.button("Создать", key="create_task_btn"):
-            # 2. И ТОЛЬКО ТУТ, когда юзер нажал кнопку, чистим текст от лишних пробелов по краям
-            clean_title = title.strip() 
-            
-            if not clean_title: # Проверяем очищенную версию, чтобы не сохраняли пустые пробелы
-                st.warning("Напиши название задачи!")
-            else:
-                new_task = {
-                    "title": clean_title, # Сохраняем тоже очищенное название
-                    "reward": reward, 
-                    "assigned_to": assignee, 
-                    "task_type": t_type, 
-                    "interval_value": val, 
-                    "interval_unit": unit, 
-                    "last_completed": "",
-                    "created_by": current_user
-                }
-              
-                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
-                save_data("tasks", db["tasks"])
-                st.success("Задача добавлена!")
-                st.rerun()
-                
-  # --- ВЫВОД ЗАДАЧ ---
-    db["tasks"] = db["tasks"].reset_index(drop=True) 
-    
-    for i, row in db["tasks"].iterrows():
-        t_type = row.get('task_type', 'Разовая')
-        is_my = row['assigned_to'] in [current_user, "Оба"]
-        
-        raw_creator = row.get('created_by')
-        creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
-        
-        assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
-        creator_label = DISPLAY.get(creator, creator)
-        
-        c1, c2, c3 = st.columns([3, 1, 0.5])
-        
-        if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
-            db["tasks"] = db["tasks"].drop(i)
-            save_data("tasks", db["tasks"])
-            st.rerun()
-
-        if t_type == "Интервальная":
             raw_last_done = row.get('last_completed')
             val = int(row.get('interval_value', 0))
             unit = row.get('interval_unit', 'Часы')
@@ -169,18 +121,19 @@ if st.session_state.page == "tasks":
                     can_do = False
                     time_text = f"⚠️ Ошибка даты"
             
-if can_do:
-                # Рисуем доступную задачу
+            if can_do:
                 c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
                 c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
                 
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
+                    
+                    # Для интервальной задачи обновляем время, а НЕ удаляем
                     db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    # Записываем в историю с датой
-                    current_time = now.strftime("%d.%m.%Y %H:%M")
+            
+                    # Добавляем текущую дату и время в историю (строго внутри кнопки!)
+                    current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{
                         "date": current_time, 
                         "buyer": current_user, 
@@ -193,31 +146,21 @@ if can_do:
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                     save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                     st.rerun()
-            
-            else: 
-                # Это else относится к if can_do: (задача на кулдауне)
+            else:
                 c1.write(f"~~{str(row['title']).strip()}~~")
                 c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
                 c2.button("⏳", key=f"t_{i}", disabled=True)
 
-        else: # РАЗОВАЯ (этот else относится к if t_type == "Интервальная":)
+        else: # РАЗОВАЯ
             c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
             c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                 db["balances"].loc[0, current_user] += int(row['reward'])
-                db["tasks"] = db["tasks"].drop(i)
+                db["tasks"] = db["tasks"].drop(i) # Разовую задачу удаляем
                 
-                # Записываем в историю с датой
-                current_time = now.strftime("%d.%m.%Y %H:%M")
-                new_log = pd.DataFrame([{
-                    "date": current_time, 
-                    "buyer": current_user, 
-                    "item": row['title'], 
-                    "price": row['reward'], 
-                    "seller": "Система", 
-                    "type": "Работа"
-                }])
+                current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                 
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                 save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
