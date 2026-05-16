@@ -3,28 +3,33 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ СТРАНИЦЫ И СТАТИЧНОЕ МЕНЮ ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ И ФИКСИРОВАННЫЙ ХЕДЕР ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
 
-# CSS для фиксации верхней панели
+# CSS для жесткой фиксации панели в самом верху
 st.markdown("""
     <style>
-        /* Фиксируем верхний контейнер */
-        div[data-testid="stVerticalBlock"] > div:has(div.nav-container) {
+        /* Прячем стандартный сайдбар и лишние отступы */
+        [data-testid="stSidebar"] {display: none;}
+        [data-testid="stHeader"] {display: none;}
+        .block-container {padding-top: 0rem !important;}
+
+        /* Создаем фиксированный контейнер */
+        .fixed-header {
             position: fixed;
-            top: 2.8rem;
+            top: 0;
+            left: 0;
+            width: 100%;
             background-color: white;
-            z-index: 999;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd;
+            z-index: 9999;
+            padding: 10px 20px;
+            border-bottom: 2px solid #f0f2f6;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-        /* Отступ для основного контента, чтобы он не заезжал под панель */
-        .main-content {
-            margin-top: 130px;
-        }
-        /* Скрываем стандартный сайдбар полностью */
-        [data-testid="stSidebar"] {
-            display: none;
+        
+        /* Отступ для контента, чтобы он не уходил под шапку */
+        .main-content-padding {
+            margin-top: 150px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -59,11 +64,9 @@ if st.session_state.user is None:
     st.title("Кто сегодня молодец? 😎")
     c1, c2 = st.columns(2)
     if c1.button(f"Я {DISPLAY['Муж']}", use_container_width=True): 
-        st.session_state.user = "Муж"
-        st.rerun()
+        st.session_state.user = "Муж"; st.rerun()
     if c2.button(f"Я {DISPLAY['Жена']}", use_container_width=True): 
-        st.session_state.user = "Жена"
-        st.rerun()
+        st.session_state.user = "Жена"; st.rerun()
     st.stop()
 
 current_user = st.session_state.user
@@ -71,29 +74,33 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-# --- ФИКСИРОВАННАЯ ВЕРХНЯЯ ПАНЕЛЬ ---
-# Оборачиваем в div с классом nav-container для CSS
-st.markdown('<div class="nav-container"></div>', unsafe_allow_html=True)
+# --- ОТРИСОВКА ФИКСИРОВАННОЙ ПАНЕЛИ ---
+# Мы используем st.container с фиксацией через CSS выше
+header_container = st.container()
+with header_container:
+    # Обертка для фиксации через HTML-пустышку
+    st.markdown('<div class="fixed-header">', unsafe_allow_html=True)
+    
+    # Первая строка: Инфо
+    c1, c2, c3 = st.columns([1.5, 2, 0.5])
+    c1.write(f"👤 **{DISPLAY[current_user]}**")
+    c2.write(f"💰 **{my_balance}** | 💖 **{my_rating}**")
+    if c3.button("🚪", key="exit_btn"):
+        st.session_state.user = None; st.rerun()
 
-# Верхняя строка: Имя и Баланс
-info_col1, info_col2, info_col3 = st.columns([2, 2, 1])
-info_col1.caption(f"👤 {DISPLAY[current_user]}")
-info_col2.caption(f"💰 {my_balance} | 💖 {my_rating}")
-if info_col3.button("🚪", help="Выйти"):
-    st.session_state.user = None
-    st.rerun()
+    # Вторая строка: Навигация
+    n1, n2, n3 = st.columns(3)
+    if n1.button("📋 Задачи", use_container_width=True, key="nav_tasks"):
+        st.session_state.page = "tasks"; st.rerun()
+    if n2.button("🛒 Маркет", use_container_width=True, key="nav_market"):
+        st.session_state.page = "market"; st.rerun()
+    if n3.button("👤 Инфо", use_container_width=True, key="nav_profile"):
+        st.session_state.page = "profile"; st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Нижняя строка: Кнопки навигации
-nav_cols = st.columns(3)
-if nav_cols[0].button("📋 Задачи", use_container_width=True):
-    st.session_state.page = "tasks"; st.rerun()
-if nav_cols[1].button("🛒 Маркет", use_container_width=True):
-    st.session_state.page = "market"; st.rerun()
-if nav_cols[2].button("👤 Инфо", use_container_width=True):
-    st.session_state.page = "profile"; st.rerun()
-
-# Контейнер-отступ, чтобы контент не прятался под панелью
-st.markdown('<div class="main-content"></div>', unsafe_allow_html=True)
+# Этот пустой блок создает отступ, чтобы основной контент не залез под шапку
+st.markdown('<div class="main-content-padding"></div>', unsafe_allow_html=True)
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
