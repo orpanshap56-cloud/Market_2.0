@@ -252,7 +252,10 @@ if st.session_state.page == "tasks":
 # ==========================================
 # ЭКРАН: МАРКЕТПЛЕЙС
 # ==========================================
-for j, row in db["market"].iterrows():
+elif st.session_state.page == "market":
+    st.title("🛒 Маркетплейс")
+
+    for j, row in db["market"].iterrows():
         # Подготовка данных лота
         l_type = row.get('type', 'Индивидуальный')
         price = int(row['price'])
