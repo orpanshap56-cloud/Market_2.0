@@ -183,7 +183,7 @@ if st.session_state.page == "tasks":
             val = c_val.number_input("Интервал повтора", min_value=1, value=12)
             unit = c_unit.selectbox("Единица времени", ["Часы", "Дни"])
             
-        if st.button("Создать задачу и выставить на доску", use_container_width=True):
+       if st.button("Создать задачу и выставить на доску", use_container_width=True):
             clean_title = title.strip()
             if not clean_title:
                 st.warning("Напиши название задачи!")
@@ -199,12 +199,19 @@ if st.session_state.page == "tasks":
                     "last_completed": "",
                     "created_by": current_user
                 }
+                
+                # Сохраняем
                 db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
                 save_data("tasks", db["tasks"])
+                
+                # 🔥 Сначала отправляем уведомление, потом РЕРАН
+                # Определяем ник для ТГ прямо здесь
+                t_label = DISPLAY.get(assignee, assignee)
+                send_telegram(f"🔔 Новая задача: {clean_title} ({reward} 🪙) для {t_label}!", target=assignee)
+                
                 st.success(f"Задача '{clean_title}' добавлена!")
-                st.rerun()
-                send_telegram(f"🔔 Новая задача: {clean_title} на {reward} 🪙 для {assignee_label}!", target=assignee)
-
+                st.rerun() # Теперь реран в самом конце
+                
     with st.expander("✨ Настройка шаблонов (Управление ценами)"):
         st.write("Создай постоянный тариф для частых задач, чтобы цена не путалась.")
         with st.form("new_template_form", clear_on_submit=True):
@@ -247,12 +254,17 @@ if st.session_state.page == "tasks":
         ["По умолчанию", "Сначала дорогие", "Сначала дешевые"]
     )
 
-    # Копируем данные для фильтрации, чтобы не менять оригинал в сессии
+   # Копируем данные для фильтрации
     df_filtered = db["tasks"].copy()
 
-    # 1. Фильтр по исполнителю
+    # 1. Фильтр по исполнителю (УМНЫЙ)
     if f_assignee != "Все":
-        df_filtered = df_filtered[df_filtered["assigned_to"] == f_assignee]
+        if f_assignee in ["Муж", "Жена"]:
+            # Если выбран Муж, показываем Муж + Оба
+            df_filtered = df_filtered[df_filtered["assigned_to"].isin([f_assignee, "Оба"])]
+        else:
+            # Если выбрано "Оба", показываем только общие
+            df_filtered = df_filtered[df_filtered["assigned_to"] == "Оба"]
 
     # 2. Фильтр по типу
     if f_type != "Все":
