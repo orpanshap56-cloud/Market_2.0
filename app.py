@@ -183,7 +183,7 @@ if st.session_state.page == "tasks":
             val = c_val.number_input("Интервал повтора", min_value=1, value=12)
             unit = c_unit.selectbox("Единица времени", ["Часы", "Дни"])
             
-       if st.button("Создать задачу и выставить на доску", use_container_width=True):
+        if st.button("Создать задачу и выставить на доску", use_container_width=True):
             clean_title = title.strip()
             if not clean_title:
                 st.warning("Напиши название задачи!")
