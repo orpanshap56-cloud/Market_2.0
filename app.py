@@ -170,8 +170,9 @@ elif st.session_state.page == "profile":
 if st.session_state.page == "tasks":
     st.title("✅ Задачи")
 
-    # --- БЛОК ДОБАВЛЕНИЯ ЗАДАЧИ ---
-    with st.expander("➕ Добавить новую задачу"):
+    # --- 1. ОПИСЫВАЕМ МОДАЛЬНЫЕ ОКНА ---
+    @st.dialog("➕ Создать задачу")
+    def add_task_modal():
         template_df = db.get("templates", pd.DataFrame(columns=["title", "reward"]))
         template_options = ["Без шаблона (Свой вариант)"]
         if not template_df.empty:
@@ -187,7 +188,7 @@ if st.session_state.page == "tasks":
             default_title = str(template_df.iloc[sel_idx]['title'])
             default_reward = int(template_df.iloc[sel_idx]['reward'])
             
-        title = st.text_input("Что сделать?", value=default_title, key=f"title_input_{selected_template}")
+        title = st.text_input("Что сделать?", value=default_title)
         reward = st.number_input("Награда (🪙)", min_value=1, value=default_reward)
         task_comment = st.text_area("Комментарий / Уточнения (необязательно)")
         assignee = st.selectbox("Кто выполняет?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
@@ -199,7 +200,7 @@ if st.session_state.page == "tasks":
             val = c_val.number_input("Интервал повтора", min_value=1, value=12)
             unit = c_unit.selectbox("Единица времени", ["Часы", "Дни"])
             
-        if st.button("Создать задачу и выставить на доску", use_container_width=True):
+        if st.button("Выставить на доску", use_container_width=True):
             clean_title = title.strip()
             if not clean_title:
                 st.warning("Напиши название задачи!")
@@ -221,10 +222,11 @@ if st.session_state.page == "tasks":
                 t_label = DISPLAY.get(assignee, assignee)
                 send_telegram(f"🔔 Новая задача: {clean_title} ({reward} 🪙) для {t_label}!", target=assignee)
                 
-                st.success(f"Задача '{clean_title}' добавлена!")
-                st.rerun()
+                # st.rerun() внутри модального окна мгновенно закрывает его и обновляет основную страницу!
+                st.rerun() 
 
-    with st.expander("✨ Настройка шаблонов"):
+    @st.dialog("✨ Настройка шаблонов")
+    def add_template_modal():
         with st.form("new_template_form", clear_on_submit=True):
             tpl_title = st.text_input("Название шаблона")
             tpl_reward = st.number_input("Фиксированная награда (🪙)", min_value=1, value=5)
@@ -233,8 +235,15 @@ if st.session_state.page == "tasks":
                     new_tpl = {"title": tpl_title.strip(), "reward": int(tpl_reward)}
                     db["templates"] = pd.concat([db["templates"], pd.DataFrame([new_tpl])], ignore_index=True)
                     save_data("templates", db["templates"])
-                    st.success("Шаблон сохранен!")
                     st.rerun()
+
+    # --- 2. КНОПКИ ВЫЗОВА ОКОН ---
+    # Теперь вместо громоздких экспандеров у тебя две аккуратные кнопки
+    col_btn1, col_btn2 = st.columns(2)
+    if col_btn1.button("➕ Добавить задачу", use_container_width=True):
+        add_task_modal()
+    if col_btn2.button("✨ Шаблоны цен", use_container_width=True):
+        add_template_modal()
 
     st.markdown("---")
 
