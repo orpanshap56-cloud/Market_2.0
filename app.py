@@ -106,7 +106,7 @@ if st.session_state.page == "tasks":
             
             if st.button("Создать"):
                 if not title:
-                st.warning("Напиши название задачи!")
+                    st.warning("Напиши название задачи!")
             else:
                 new_task = {
                     "title": title, 
