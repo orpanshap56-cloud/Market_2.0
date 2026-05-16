@@ -2,7 +2,20 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
+import requests
 
+def send_telegram(text, target="Оба"):
+    token = st.secrets["TELEGRAM_TOKEN"]
+    ids = {
+        "Муж": [st.secrets["MY_CHAT_ID"]],
+        "Жена": [st.secrets["WIFE_CHAT_ID"]],
+        "Оба": [st.secrets["MY_CHAT_ID"], st.secrets["WIFE_CHAT_ID"]]
+    }
+    
+    for chat_id in ids.get(target, []):
+        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}"
+        try: requests.get(url)
+        except: pass
 #-----Уровни--------
 def get_level_data(xp):
     level = 1
@@ -178,6 +191,7 @@ if st.session_state.page == "tasks":
                 save_data("tasks", db["tasks"])
                 st.success(f"Задача '{clean_title}' добавлена!")
                 st.rerun()
+                send_telegram(f"🔔 Новая задача: {clean_title} на {reward} 🪙 для {assignee_label}!", target=assignee)
 
     with st.expander("✨ Настройка шаблонов (Управление ценами)"):
         st.write("Создай постоянный тариф для частых задач, чтобы цена не путалась.")
