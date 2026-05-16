@@ -15,7 +15,8 @@ def sync_database():
         "balances": get_data("balances"),
         "tasks": get_data("tasks"),
         "market": get_data("market"),
-        "history": get_data("history")
+        "history": get_data("history"),
+        "templates": get_data("templates") # Подключили новую вкладку шаблонов
     }
 
 if "db" not in st.session_state: sync_database()
@@ -26,11 +27,10 @@ if "page" not in st.session_state: st.session_state.page = "tasks"
 if "db" not in st.session_state: sync_database()
 db = st.session_state.db 
 
-# Аккуратно читаем ники (чтобы код не упал, если колонок вдруг нет)
+# Аккуратно читаем ники
 h_name = db["balances"].loc[0, "Муж_Имя"] if "Муж_Имя" in db["balances"].columns else "Муж"
 w_name = db["balances"].loc[0, "Жена_Имя"] if "Жена_Имя" in db["balances"].columns else "Жена"
 
-# Словарь для перевода системной роли в красивый ник
 DISPLAY = {"Муж": h_name, "Жена": w_name, "Оба": "Оба"}
 
 # --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
@@ -49,8 +49,6 @@ if st.session_state.user is None:
 current_user = st.session_state.user
 partner = "Жена" if current_user == "Муж" else "Муж"
 
-db = st.session_state.db
-current_user = st.session_state.user
 my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 
@@ -65,7 +63,6 @@ with st.sidebar:
         sync_database()
         st.rerun()
     
-    # НОВЫЕ КНОПКИ НАВИГАЦИИ
     if st.button("📋 Список задач", use_container_width=True):
         st.session_state.page = "tasks"
         st.rerun()
@@ -81,7 +78,6 @@ with st.sidebar:
         st.session_state.user = None
         st.rerun()
 
-# Фиксируем текущее время для расчетов
 now = datetime.now()
 
 # ==========================================
@@ -90,6 +86,79 @@ now = datetime.now()
 if st.session_state.page == "tasks":
     st.title("✅ Задачи")
 
+    # --- БЛОК 1: ДОБАВЛЕНИЕ ЗАДАЧИ (С ШАБЛОНАМИ) ---
+    with st.expander("➕ Добавить новую задачу"):
+        template_df = db.get("templates", pd.DataFrame(columns=["title", "reward"]))
+        
+        # Собираем список шаблонов для выпадающего меню
+        template_options = ["Без шаблона (Свой вариант)"]
+        if not template_df.empty:
+            for idx, t_row in template_df.iterrows():
+                template_options.append(f"{t_row['title']} ({t_row['reward']} 🪙)")
+                
+        selected_template = st.selectbox("Выбрать из готовых шаблонов", template_options)
+        
+        # Подставляем значения в зависимости от выбора
+        default_title = ""
+        default_reward = 10
+        if selected_template != "Без шаблона (Свой вариант)":
+            sel_idx = template_options.index(selected_template) - 1
+            default_title = str(template_df.iloc[sel_idx]['title'])
+            default_reward = int(template_df.iloc[sel_idx]['reward'])
+            
+        # Используем динамический key, чтобы поля мгновенно обновлялись при смене шаблона
+        title = st.text_input("Что сделать?", value=default_title, key=f"title_input_{selected_template}")
+        reward = st.number_input("Награда (🪙)", min_value=1, value=default_reward, key=f"reward_input_{selected_template}")
+        
+        assignee = st.selectbox("Кто выполняет?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+        t_type = st.radio("Режим задачи", ["Разовая", "Интервальная"])
+        
+        val, unit = 0, ""
+        if t_type == "Интервальная":
+            c_val, c_unit = st.columns(2)
+            val = c_val.number_input("Интервал повтора", min_value=1, value=12)
+            unit = c_unit.selectbox("Единица времени", ["Часы", "Дни"])
+            
+        if st.button("Создать задачу и выставить на доску", use_container_width=True):
+            clean_title = title.strip()
+            if not clean_title:
+                st.warning("Напиши название задачи!")
+            else:
+                new_task = {
+                    "title": clean_title,
+                    "reward": reward,
+                    "assigned_to": assignee,
+                    "task_type": t_type,
+                    "interval_value": val,
+                    "interval_unit": unit,
+                    "last_completed": "",
+                    "created_by": current_user
+                }
+                db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
+                save_data("tasks", db["tasks"])
+                st.success(f"Задача '{clean_title}' добавлена!")
+                st.rerun()
+
+    # --- БЛОК 2: СОЗДАНИЕ ШАБЛОНОВ ---
+    with st.expander("✨ Настройка шаблонов (Управление ценами)"):
+        st.write("Создай постоянный тариф для частых задач, чтобы цена не путалась.")
+        with st.form("new_template_form", clear_on_submit=True):
+            tpl_title = st.text_input("Название шаблона (например, Помыть посуду)")
+            tpl_reward = st.number_input("Фиксированная награда (🪙)", min_value=1, value=5)
+            
+            if st.form_submit_button("Сохранить этот шаблон"):
+                if tpl_title.strip():
+                    new_tpl = {"title": tpl_title.strip(), "reward": int(tpl_reward)}
+                    db["templates"] = pd.concat([db["templates"], pd.DataFrame([new_tpl])], ignore_index=True)
+                    save_data("templates", db["templates"])
+                    st.success(f"Шаблон '{tpl_title}' успешно сохранен!")
+                    st.rerun()
+                else:
+                    st.warning("Введи название для шаблона!")
+
+    st.markdown("---")
+
+    # --- БЛОК 3: ВЫВОД ТЕКУЩИХ ЗАДАЧ ---
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
@@ -100,7 +169,6 @@ if st.session_state.page == "tasks":
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
         
-        # Создаем колонки
         c1, c2, c3 = st.columns([3, 1, 0.5])
         
         if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
@@ -146,12 +214,9 @@ if st.session_state.page == "tasks":
                 
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
-                    
-                    # Для интервальной задачи обновляем время
                     db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
                     db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
             
-                    # Добавляем текущую дату и время в историю
                     current_time = now.strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{
                         "date": current_time, 
@@ -176,7 +241,7 @@ if st.session_state.page == "tasks":
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                 db["balances"].loc[0, current_user] += int(row['reward'])
-                db["tasks"] = db["tasks"].drop(i) # Разовую задачу удаляем
+                db["tasks"] = db["tasks"].drop(i)
                 
                 current_time = now.strftime("%d.%m.%Y %H:%M")
                 new_log = pd.DataFrame([{
@@ -199,21 +264,18 @@ elif st.session_state.page == "market":
     st.title("🛒 Маркетплейс")
     
     for j, row in db["market"].iterrows():
-        # Те же три колонки: описание, кнопка покупки и корзина
         c1, c2, c3 = st.columns([3, 1, 0.5])
         price = int(row['price'])
         is_my_item = (row['seller'] == current_user)
         can_buy = (not is_my_item) and (my_balance >= price)
         btn_label = "Мой лот" if is_my_item else "Купить"
         
-        # Кнопка удаления лота (🗑️)
         if c3.button("🗑️", key=f"del_m_{j}", help="Удалить лот с витрины"):
             db["market"] = db["market"].drop(j)
             save_data("market", db["market"])
             st.rerun()
         
         if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy):
-            # Снимаем 🪙, начисляем 💖 партнеру
             db["balances"].loc[0, current_user] -= price
             if row['seller'] != "Оба":
                 partner_key = f"{row['seller']}_Рейтинг"
@@ -239,7 +301,6 @@ elif st.session_state.page == "market":
             display_name += " *(Ваше)*"
         c1.write(display_name)
     
-    # --- ДОБАВЛЕНИЕ ЛОТА ---
     with st.expander("🏷️ Выставить лот на продажу"):
         with st.form("new_market_form", clear_on_submit=True):
             m_title = st.text_input("Что продаем?")
@@ -262,17 +323,13 @@ elif st.session_state.page == "market":
 elif st.session_state.page == "profile":
     st.title("👤 Личный кабинет")
     
-    # --- НАСТРОЙКИ ПРОФИЛЯ (СМЕНА НИКА) ---
     with st.expander("⚙️ Настройки профиля"):
         new_name = st.text_input("Мой никнейм", value=DISPLAY[current_user])
         if st.button("Сохранить"):
             col_name = f"{current_user}_Имя"
-            
-            # Принудительно создаем колонку как текстовую, если её нет
             if col_name not in db["balances"].columns:
                 db["balances"][col_name] = ""
             
-            # Лечим ошибку Pandas: приводим к строковому типу
             db["balances"][col_name] = db["balances"][col_name].astype(str)
             db["balances"].loc[0, col_name] = new_name
             
@@ -283,12 +340,8 @@ elif st.session_state.page == "profile":
 
     st.markdown("---")
 
-    # --- ОБЩАЯ СТАТИСТИКА ---
     col_info1, col_info2, col_info3 = st.columns(3)
-    
-    # Считаем доходы от задач
     earned = db['history'][(db['history']['buyer'] == current_user) & (db['history']['type'] == 'Работа')]['price'].sum()
-    # Считаем траты в магазине
     spent = db['history'][(db['history']['buyer'] == current_user) & (db['history']['type'] == 'Покупка')]['price'].sum()
     
     col_info1.metric("Заработано 🪙", f"{earned}")
@@ -297,7 +350,6 @@ elif st.session_state.page == "profile":
 
     st.markdown("---")
 
-    # --- МОИ ЛОТЫ НА ВИТРИНЕ ---
     st.subheader("📦 Мои товары в продаже")
     my_lots = db["market"][db["market"]['seller'] == current_user]
     if not my_lots.empty:
@@ -305,11 +357,9 @@ elif st.session_state.page == "profile":
     else:
         st.write("Вы еще ничего не выставили на продажу.")
 
-    # --- ИСТОРИЯ ПОКУПОК ---
     st.subheader("🛍️ История моих покупок")
     my_buys = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Покупка')]
     if not my_buys.empty:
-        # Проверяем, есть ли уже колонка date в таблице
         if 'date' in my_buys.columns:
             st.dataframe(my_buys[['date', 'item', 'price', 'seller']], use_container_width=True, hide_index=True)
         else:
@@ -317,7 +367,6 @@ elif st.session_state.page == "profile":
     else:
         st.write("Вы еще ничего не купили.")
     
-    # --- МОИ ПРОДАЖИ (РЕЙТИНГ) ---
     st.subheader("💖 За что получен рейтинг")
     my_sales = db["history"][(db["history"]['seller'] == current_user) & (db["history"]['type'] == 'Покупка')]
     if not my_sales.empty:
@@ -330,13 +379,11 @@ elif st.session_state.page == "profile":
     else:
         st.write("Ваши лоты еще не покупали.")
 
-    # --- ИСТОРИЯ ВЫПОЛНЕННЫХ ЗАДАЧ ---
     st.markdown("---")
     st.subheader("✅ Выполненные задачи")
     my_tasks = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Работа')]
     
     if not my_tasks.empty:
-        # Отбираем нужные колонки с проверкой на наличие date
         if 'date' in my_tasks.columns:
             display_tasks = my_tasks[['date', 'item', 'price']].copy()
             display_tasks = display_tasks.rename(columns={'date': 'Когда', 'item': 'Что было сделано', 'price': 'Заработано 🪙'})
