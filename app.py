@@ -112,8 +112,9 @@ if st.session_state.page == "tasks":
                 st.success("Задача добавлена!")
                 st.rerun()
                 
-    # --- ВЫВОД ЗАДАЧ ---
+   # --- ВЫВОД ЗАДАЧ ---
     db["tasks"] = db["tasks"].reset_index(drop=True) 
+    
     for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
@@ -141,9 +142,7 @@ if st.session_state.page == "tasks":
             
             if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
                 try:
-                    # 🔥 Бронебойный парсер переехал на свое законное место
                     last_done_dt = pd.to_datetime(str(raw_last_done))
-                    
                     if last_done_dt.tzinfo is not None:
                         last_done_dt = last_done_dt.tz_localize(None)
                         
@@ -162,7 +161,6 @@ if st.session_state.page == "tasks":
                             minutes, _ = divmod(remainder, 60)
                             time_text = f"⏳ Доступно через {hours}ч {minutes}м"
                 except Exception as e:
-                    # Если что-то сломалось, мы БЛОКИРУЕМ задачу, а не разрешаем фармить
                     can_do = False
                     time_text = f"⚠️ Ошибка даты"
             
@@ -186,92 +184,6 @@ if st.session_state.page == "tasks":
 
         else: # РАЗОВАЯ
             c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
-            c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
-            
-            if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
-                db["balances"].loc[0, current_user] += int(row['reward'])
-                db["tasks"] = db["tasks"].drop(i)
-                new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
-                db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-                st.rerun()
-        
-        # --- ИСПРАВЛЕННЫЙ БЛОК ИМЕН ---
-        raw_creator = row.get('created_by')
-        # Если в ячейке пусто (NaN), пишем "Система", иначе берем имя
-        creator = raw_creator if pd.notna(raw_creator) and raw_creator != "" else "Система"
-        
-        assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
-        creator_label = DISPLAY.get(creator, creator)
-        # ------------------------------
-        
-        # Делаем три колонки: текст, кнопка "Готово" и корзина
-        c1, c2, c3 = st.columns([3, 1, 0.5])
-        
-        # Кнопка удаления (доступна всем)
-        if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
-            db["tasks"] = db["tasks"].drop(i)
-            save_data("tasks", db["tasks"])
-            st.rerun()
-
-        if t_type == "Интервальная":
-            # 1. Берем значение как есть, не превращая сразу в строку
-            raw_last_done = row.get('last_completed')
-            
-            # 2. Проверяем: не пусто ли там (и не NaN ли это)
-            can_do = True
-            time_text = ""
-            
-            if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
-                try:
-                    last_done_str = str(raw_last_done)
-                    last_done_dt = datetime.strptime(last_done_str, '%Y-%m-%d %H:%M:%S')
-                    
-                    if unit == "Часы":
-                        next_available = last_done_dt + timedelta(hours=val)
-                    else:
-                        next_available = last_done_dt + timedelta(days=val)
-                    
-                    if now < next_available:
-                        can_do = False
-                        diff = next_available - now
-                        if diff.days > 0:
-                            time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
-                        else:
-                            hours, remainder = divmod(diff.seconds, 3600)
-                            minutes, _ = divmod(remainder, 60)
-                            time_text = f"⏳ Доступно через {hours}ч {minutes}м"
-                except ValueError:
-                    # Если в таблице оказался какой-то левый текст, просто разрешаем делать задачу
-                    can_do = True
-            
-            if can_do:
-                c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
-                c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
-                
-                if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
-                    db["balances"].loc[0, current_user] += int(row['reward'])
-                    
-                    # --- ВОТ ОН, НАШ СПАСИТЕЛЬНЫЙ КОСТЫЛЬ ---
-                    db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
-                    # ----------------------------------------
-                    
-                    db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
-                    db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                    save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-                    st.rerun()
-                    st.rerun()
-            else:
-                c1.write(f"~~{row['title']}~~")
-                ### НОВОЕ: Подпись под зачеркнутой задачей (на кулдауне)
-                c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
-                c2.button("⏳", key=f"t_{i}", disabled=True)
-
-        else: # РАЗОВАЯ
-            c1.write(f"**{row['title']}** (+{row['reward']} 🪙)")
-            ### НОВОЕ: Подпись под разовой задачей
             c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
