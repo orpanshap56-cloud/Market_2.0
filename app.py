@@ -99,13 +99,13 @@ if st.session_state.page == "tasks":
         
             val, unit = 0, ""
         
-          if t_type == "Интервальная":
-            c_val, c_unit = st.columns(2)
-            val = c_val.number_input("Интервал", min_value=1, value=12)
-            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
+            if t_type == "Интервальная":
+                c_val, c_unit = st.columns(2)
+                val = c_val.number_input("Интервал", min_value=1, value=12)
+                unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
             
-          if st.button("Создать"):
-            if not title:
+            if st.button("Создать"):
+                if not title:
                 st.warning("Напиши название задачи!")
             else:
                 new_task = {
