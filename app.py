@@ -5,17 +5,28 @@ from datetime import datetime, timedelta
 import requests
 
 def send_telegram(text, target="Оба"):
-    token = st.secrets["TELEGRAM_TOKEN"]
-    ids = {
-        "Муж": [st.secrets["MY_CHAT_ID"]],
-        "Жена": [st.secrets["WIFE_CHAT_ID"]],
-        "Оба": [st.secrets["MY_CHAT_ID"], st.secrets["WIFE_CHAT_ID"]]
-    }
-    
-    for chat_id in ids.get(target, []):
-        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}"
-        try: requests.get(url)
-        except: pass
+    try:
+        token = st.secrets["TELEGRAM_TOKEN"]
+        # Используем те же ключи, что в selectbox
+        ids = {
+            "Муж": [st.secrets["MY_CHAT_ID"]],
+            "Жена": [st.secrets["WIFE_CHAT_ID"]],
+            "Оба": [st.secrets["MY_CHAT_ID"], st.secrets["WIFE_CHAT_ID"]]
+        }
+        
+        target_ids = ids.get(target, [])
+        for chat_id in target_ids:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            params = {"chat_id": chat_id, "text": text}
+            response = requests.get(url, params=params)
+            
+            if not response.ok:
+                st.error(f"❌ Ошибка ТГ для ID {chat_id}: {response.text}")
+            else:
+                st.toast(f"✅ Уведомление отправлено на ID {chat_id}")
+                
+    except Exception as e:
+        st.error(f"💥 Критическая ошибка функции: {e}")
 #-----Уровни--------
 def get_level_data(xp):
     level = 1
