@@ -3,28 +3,8 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- 1. НАСТРОЙКИ И ЧИСТЫЙ СТИЛЬ ---
+# --- 1. НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(page_title="Семейная Экономика", page_icon="💰", layout="centered")
-
-st.markdown("""
-    <style>
-        /* Полностью скрываем стандартный сайдбар и хедер */
-        [data-testid="stSidebar"] {display: none;}
-        [data-testid="stHeader"] {display: none;}
-        
-        /* Убираем лишние отступы сверху, чтобы панель была в самом верху */
-        .block-container {padding-top: 1rem !important;}
-
-        /* Стилизуем нашу "шторку", чтобы она была серой и аккуратной */
-        .stExpander {
-            background-color: #f0f2f6;
-            border-radius: 15px !important;
-            border: 1px solid #d1d5db !important;
-        }
-        /* Делаем текст внутри шторки компактным */
-        .stMarkdown p { margin-bottom: 2px !important; }
-    </style>
-""", unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -46,9 +26,12 @@ if "db" not in st.session_state: sync_database()
 if "user" not in st.session_state: st.session_state.user = None
 if "page" not in st.session_state: st.session_state.page = "tasks"
 
+# --- ПОДГОТОВКА ДАННЫХ ИЗ КЭША ---
 db = st.session_state.db 
+
 h_name = db["balances"].loc[0, "Муж_Имя"] if "Муж_Имя" in db["balances"].columns else "Муж"
 w_name = db["balances"].loc[0, "Жена_Имя"] if "Жена_Имя" in db["balances"].columns else "Жена"
+
 DISPLAY = {"Муж": h_name, "Жена": w_name, "Оба": "Оба"}
 
 # --- ЭКРАН ВЫБОРА ПРОФИЛЯ ---
@@ -56,9 +39,11 @@ if st.session_state.user is None:
     st.title("Кто сегодня молодец? 😎")
     c1, c2 = st.columns(2)
     if c1.button(f"Я {DISPLAY['Муж']}", use_container_width=True): 
-        st.session_state.user = "Муж"; st.rerun()
+        st.session_state.user = "Муж"
+        st.rerun()
     if c2.button(f"Я {DISPLAY['Жена']}", use_container_width=True): 
-        st.session_state.user = "Жена"; st.rerun()
+        st.session_state.user = "Жена"
+        st.rerun()
     st.stop()
 
 current_user = st.session_state.user
@@ -66,25 +51,29 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-# --- ВЕРХНЯЯ ВЫДВИЖНАЯ ПАНЕЛЬ (ШТОРКА) ---
-# Баланс вынесен в заголовок, чтобы его было видно всегда
-with st.expander(f"👤 {DISPLAY[current_user]} | 💰 {my_balance} | 💖 {my_rating}", expanded=False):
-    nav_cols = st.columns(3)
-    if nav_cols[0].button("📋 Задачи", use_container_width=True, key="nav_t"):
-        st.session_state.page = "tasks"; st.rerun()
-    if nav_cols[1].button("🛒 Маркет", use_container_width=True, key="nav_m"):
-        st.session_state.page = "market"; st.rerun()
-    if nav_cols[2].button("👤 Профиль", use_container_width=True, key="nav_p"):
-        st.session_state.page = "profile"; st.rerun()
+# --- СТАНДАРТНЫЙ САЙДБАР ---
+with st.sidebar:
+    st.title(f"{DISPLAY[current_user]}")
+    st.metric("Кошелек", f"{my_balance} 🪙")
+    st.metric("Рейтинг", f"{my_rating} 💖")
     
     st.markdown("---")
-    c1, c2 = st.columns([3, 1])
-    if c1.button("🔄 Синхронизировать базу", use_container_width=True):
-        sync_database(); st.rerun()
-    if c2.button("🚪 Выход", use_container_width=True):
-        st.session_state.user = None; st.rerun()
-
-st.markdown("---") # Визуальная граница
+    
+    # Навигация
+    if st.button("📋 Список задач", use_container_width=True):
+        st.session_state.page = "tasks"
+        st.rerun()
+            
+    if st.button("🛒 Маркетплейс", use_container_width=True):
+        st.session_state.page = "market"
+        st.rerun()
+            
+    if st.button("👤 Личный кабинет", use_container_width=True):
+        st.session_state.page = "profile"
+        st.rerun()
+        
+    st.markdown("---")
+    if st.button("🔄 Синхронизировать", use
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
