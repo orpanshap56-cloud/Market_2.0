@@ -169,43 +169,56 @@ if st.session_state.page == "tasks":
                     can_do = False
                     time_text = f"⚠️ Ошибка даты"
             
-            if can_do:
-                # Отступы выровнены, strip() на месте
+if can_do:
+                # Рисуем доступную задачу
                 c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
                 c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
                 
                 if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                     db["balances"].loc[0, current_user] += int(row['reward'])
-                    db["tasks"] = db["tasks"].drop(i)
+                    db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
+                    db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Записываем в историю с датой
+                    current_time = now.strftime("%d.%m.%Y %H:%M")
+                    new_log = pd.DataFrame([{
+                        "date": current_time, 
+                        "buyer": current_user, 
+                        "item": row['title'], 
+                        "price": row['reward'], 
+                        "seller": "Система", 
+                        "type": "Работа"
+                    }])
+                    
+                    db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                    save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
+                    st.rerun()
             
-            # Добавляем текущую дату и время
-            current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-            
-            new_log = pd.DataFrame([{
-                "date": current_time, 
-                "buyer": current_user, 
-                "item": row['title'], 
-                "price": row['reward'], 
-                "seller": "Система", 
-                "type": "Работа"
-            }])
-            
-            db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-            save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-            st.rerun()
-        else:
-            c1.write(f"~~{str(row['title']).strip()}~~")
-            c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
-            c2.button("⏳", key=f"t_{i}", disabled=True)
+            else: 
+                # Это else относится к if can_do: (задача на кулдауне)
+                c1.write(f"~~{str(row['title']).strip()}~~")
+                c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
+                c2.button("⏳", key=f"t_{i}", disabled=True)
 
-        else: # РАЗОВАЯ
+        else: # РАЗОВАЯ (этот else относится к if t_type == "Интервальная":)
             c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
             c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
             if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
                 db["balances"].loc[0, current_user] += int(row['reward'])
                 db["tasks"] = db["tasks"].drop(i)
-                new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+                
+                # Записываем в историю с датой
+                current_time = now.strftime("%d.%m.%Y %H:%M")
+                new_log = pd.DataFrame([{
+                    "date": current_time, 
+                    "buyer": current_user, 
+                    "item": row['title'], 
+                    "price": row['reward'], 
+                    "seller": "Система", 
+                    "type": "Работа"
+                }])
+                
                 db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                 save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                 st.rerun()
