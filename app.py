@@ -186,13 +186,13 @@ if st.session_state.page == "tasks":
            c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
         c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
             
-            if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
-                db["balances"].loc[0, current_user] += int(row['reward'])
-                db["tasks"] = db["tasks"].drop(i)
-                new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
-                db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-                st.rerun()
+        if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
+             db["balances"].loc[0, current_user] += int(row['reward'])
+             db["tasks"] = db["tasks"].drop(i)
+             new_log = pd.DataFrame([{"buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+            db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+             save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
+             st.rerun()
                 
 # ==========================================
 # ЭКРАН: МАРКЕТПЛЕЙС
