@@ -81,35 +81,28 @@ if st.session_state.page == "tasks":
 
     # --- ФОРМА СОЗДАНИЯ ---
     with st.expander("➕ Добавить задачу"):
-            # Добавим .strip() прямо тут
-            clean_title = title.strip()
+        
+        title = st.text_input("Что сделать?", key="new_task_title_input") 
+        reward = st.number_input("Награда", min_value=1, value=10)
+        assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+        t_type = st.radio("Режим", ["Разовая", "Интервальная"])
+        
+        val, unit = 0, ""
+        
+        if t_type == "Интервальная":
+            c_val, c_unit = st.columns(2)
+            val = c_val.number_input("Интервал", min_value=1, value=12)
+            unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
             
-            if not clean_title:
+        if st.button("Создать", key="create_task_btn"):
+            # 2. И ТОЛЬКО ТУТ, когда юзер нажал кнопку, чистим текст от лишних пробелов по краям
+            clean_title = title.strip() 
+            
+            if not clean_title: # Проверяем очищенную версию, чтобы не сохраняли пустые пробелы
                 st.warning("Напиши название задачи!")
             else:
                 new_task = {
-                    "title": clean_title,  # <-- И сохраняем уже чистый текст
-                    "reward": reward, 
-                }
-                    # ... остальное без изменений
-            title = st.text_input("Что сделать?")
-            reward = st.number_input("Награда", min_value=1, value=10)
-            assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
-            t_type = st.radio("Режим", ["Разовая", "Интервальная"])
-        
-            val, unit = 0, ""
-        
-            if t_type == "Интервальная":
-                c_val, c_unit = st.columns(2)
-                val = c_val.number_input("Интервал", min_value=1, value=12)
-                unit = c_unit.selectbox("Единица", ["Часы", "Дни"])
-            
-            if st.button("Создать"):
-                if not title:
-                    st.warning("Напиши название задачи!")
-            else:
-                new_task = {
-                    "title": title, 
+                    "title": clean_title, # Сохраняем тоже очищенное название
                     "reward": reward, 
                     "assigned_to": assignee, 
                     "task_type": t_type, 
@@ -118,6 +111,7 @@ if st.session_state.page == "tasks":
                     "last_completed": "",
                     "created_by": current_user
                 }
+              
                 db["tasks"] = pd.concat([db["tasks"], pd.DataFrame([new_task])], ignore_index=True)
                 save_data("tasks", db["tasks"])
                 st.success("Задача добавлена!")
