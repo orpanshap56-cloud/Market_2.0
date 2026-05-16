@@ -75,7 +75,7 @@ with st.sidebar:
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
-for i, row in db["tasks"].iterrows():
+    for i, row in db["tasks"].iterrows():
         t_type = row.get('task_type', 'Разовая')
         is_my = row['assigned_to'] in [current_user, "Оба"]
         
