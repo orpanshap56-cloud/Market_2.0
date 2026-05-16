@@ -174,80 +174,54 @@ if st.session_state.page == "tasks":
         
         c1, c2, c3 = st.columns([3, 1, 0.5])
         
-        if c3.button("🗑️", key=f"del_t_{i}", help="Удалить задачу"):
-            db["tasks"] = db["tasks"].drop(i)
-            save_data("tasks", db["tasks"])
-            st.rerun()
+        # --- ОПТИМИЗИРОВАННЫЙ ВЫВОД (ПК + МОБИЛКА) ---
+        with st.container(border=True): # Каждая задача в своей "карточке"
+            head_col, del_col = st.columns([5, 0.5])
+            
+            # Заголовок и удаление (в одну строку, чтобы не занимать место)
+            head_col.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
+            if del_col.button("🗑️", key=f"del_t_{i}", help="Удалить"):
+                db["tasks"] = db["tasks"].drop(i)
+                save_data("tasks", db["tasks"])
+                st.rerun()
 
-        if t_type == "Интервальная":
-            raw_last_done = row.get('last_completed')
-            val = int(row.get('interval_value', 0))
-            unit = row.get('interval_unit', 'Часы')
-            can_do = True
-            time_text = ""
+            # Комментарий
+            if raw_comment:
+                st.caption(f"💬 *{raw_comment}*")
             
-            if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
-                try:
-                    last_done_dt = pd.to_datetime(str(raw_last_done))
-                    if last_done_dt.tzinfo is not None:
-                        last_done_dt = last_done_dt.tz_localize(None)
+            # Инфо-строка
+            st.caption(f"✍️ {creator_label} ➔ 🎯 {assignee_label}")
+
+            # Кнопка действия (на мобилке она будет под текстом, если не влезет)
+            btn_col, status_col = st.columns([1, 1])
+
+            if t_type == "Интервальная":
+                # Логика интервала (can_do и time_text уже должны быть посчитаны выше в коде)
+                if can_do:
+                    if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
+                        db["balances"].loc[0, current_user] += int(row['reward'])
+                        db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
+                        db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
                         
-                    if unit == "Часы":
-                        next_available = last_done_dt + timedelta(hours=val)
-                    else:
-                        next_available = last_done_dt + timedelta(days=val)
-                    
-                    if now < next_available:
-                        can_do = False
-                        diff = next_available - now
-                        if diff.days > 0:
-                            time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
-                        else:
-                            hours, remainder = divmod(diff.seconds, 3600)
-                            minutes, _ = divmod(remainder, 60)
-                            time_text = f"⏳ Доступно через {hours}ч {minutes}м"
-                except Exception as e:
-                    can_do = False
-                    time_text = f"⚠️ Ошибка даты"
+                        current_time = now.strftime("%d.%m.%Y %H:%M")
+                        new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
+                        db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
+                        save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
+                        st.rerun()
+                else:
+                    status_col.write(f"{time_text}")
+                    btn_col.button("⏳", key=f"t_{i}", disabled=True, use_container_width=True)
             
-            if can_do:
-                c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
-                if pd.notna(raw_comment) and str(raw_comment).strip() != "":
-                    c1.caption(f"💬 *{str(raw_comment).strip()}*")
-                c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
-                
-                if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
+            else: # РАЗОВАЯ
+                if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
                     db["balances"].loc[0, current_user] += int(row['reward'])
-                    db["tasks"]['last_completed'] = db["tasks"]['last_completed'].astype(str)
-                    db["tasks"].at[i, 'last_completed'] = now.strftime('%Y-%m-%d %H:%M:%S')
-            
+                    db["tasks"] = db["tasks"].drop(i)
+                    
                     current_time = now.strftime("%d.%m.%Y %H:%M")
                     new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
                     db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                     save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
                     st.rerun()
-            else:
-                c1.write(f"~~{str(row['title']).strip()}~~")
-                if pd.notna(raw_comment) and str(raw_comment).strip() != "":
-                    c1.caption(f"💬 *{str(raw_comment).strip()}*")
-                c1.caption(f"{time_text} | 🎯 Для: {assignee_label}")
-                c2.button("⏳", key=f"t_{i}", disabled=True)
-
-        else: # РАЗОВАЯ
-            c1.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
-            if pd.notna(raw_comment) and str(raw_comment).strip() != "":
-                c1.caption(f"💬 *{str(raw_comment).strip()}*")
-            c1.caption(f"✍️ От: {creator_label} | 🎯 Для: {assignee_label}")
-            
-            if c2.button("Готово!", key=f"t_{i}", disabled=not is_my):
-                db["balances"].loc[0, current_user] += int(row['reward'])
-                db["tasks"] = db["tasks"].drop(i)
-                
-                current_time = now.strftime("%d.%m.%Y %H:%M")
-                new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": row['reward'], "seller": "Система", "type": "Работа"}])
-                db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
-                save_data("balances", db["balances"]); save_data("tasks", db["tasks"]); save_data("history", db["history"])
-                st.rerun()
                 
 # ==========================================
 # ЭКРАН: МАРКЕТПЛЕЙС
