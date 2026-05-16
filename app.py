@@ -64,15 +64,21 @@ with st.sidebar:
         sync_database()
         st.rerun()
     
+    # НОВЫЕ КНОПКИ НАВИГАЦИИ
     if st.button("📋 Список задач", use_container_width=True):
-        st.session_state.page = "tasks"
-        st.rerun()
+        if st.session_state.page != "tasks":
+            st.session_state.page = "tasks"
+            st.rerun()
+            
     if st.button("🛒 Маркетплейс", use_container_width=True):
-        st.session_state.page = "market"
-        st.rerun()
+        if st.session_state.page != "market":
+            st.session_state.page = "market"
+            st.rerun()
+            
     if st.button("👤 Личный кабинет", use_container_width=True):
-        st.session_state.page = "profile"
-        st.rerun()
+        if st.session_state.page != "profile":
+            st.session_state.page = "profile"
+            st.rerun()
         
     st.markdown("---")
     if st.button("🚪 Выйти", use_container_width=True):
