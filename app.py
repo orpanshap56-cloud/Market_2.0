@@ -97,7 +97,7 @@ if st.session_state.page == "tasks":
             assignee = st.selectbox("Кто?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
             t_type = st.radio("Режим", ["Разовая", "Интервальная"])
         
-        val, unit = 0, ""
+            val, unit = 0, ""
         
         if t_type == "Интервальная":
             c_val, c_unit = st.columns(2)
