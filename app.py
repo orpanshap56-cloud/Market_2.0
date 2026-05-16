@@ -172,13 +172,44 @@ if st.session_state.page == "tasks":
         assignee_label = DISPLAY.get(row['assigned_to'], row['assigned_to'])
         creator_label = DISPLAY.get(creator, creator)
         
-        c1, c2, c3 = st.columns([3, 1, 0.5])
+        # --- 1. ЛОГИКА РАСЧЕТА ВРЕМЕНИ (ВОЗВРАЩАЕМ ПЕРЕМЕННЫЕ) ---
+        can_do = True
+        time_text = ""
         
-        # --- ОПТИМИЗИРОВАННЫЙ ВЫВОД (ПК + МОБИЛКА) ---
+        if t_type == "Интервальная":
+            raw_last_done = row.get('last_completed')
+            val = int(row.get('interval_value', 0))
+            unit = row.get('interval_unit', 'Часы')
+            
+            if pd.notna(raw_last_done) and str(raw_last_done).strip() != "" and str(raw_last_done) != "nan":
+                try:
+                    last_done_dt = pd.to_datetime(str(raw_last_done))
+                    if last_done_dt.tzinfo is not None:
+                        last_done_dt = last_done_dt.tz_localize(None)
+                        
+                    if unit == "Часы":
+                        next_available = last_done_dt + timedelta(hours=val)
+                    else:
+                        next_available = last_done_dt + timedelta(days=val)
+                    
+                    if now < next_available:
+                        can_do = False
+                        diff = next_available - now
+                        if diff.days > 0:
+                            time_text = f"⏳ Доступно через {diff.days}д {diff.seconds // 3600}ч"
+                        else:
+                            hours, remainder = divmod(diff.seconds, 3600)
+                            minutes, _ = divmod(remainder, 60)
+                            time_text = f"⏳ Доступно через {hours}ч {minutes}м"
+                except Exception as e:
+                    can_do = False
+                    time_text = f"⚠️ Ошибка даты"
+
+        # --- 2. ОПТИМИЗИРОВАННЫЙ ВЫВОД (ПК + МОБИЛКА) ---
         with st.container(border=True): # Каждая задача в своей "карточке"
             head_col, del_col = st.columns([5, 0.5])
             
-            # Заголовок и удаление (в одну строку, чтобы не занимать место)
+            # Заголовок и удаление
             head_col.write(f"**{str(row['title']).strip()}** (+{row['reward']} 🪙)")
             if del_col.button("🗑️", key=f"del_t_{i}", help="Удалить"):
                 db["tasks"] = db["tasks"].drop(i)
@@ -192,11 +223,10 @@ if st.session_state.page == "tasks":
             # Инфо-строка
             st.caption(f"✍️ {creator_label} ➔ 🎯 {assignee_label}")
 
-            # Кнопка действия (на мобилке она будет под текстом, если не влезет)
+            # Кнопка действия
             btn_col, status_col = st.columns([1, 1])
 
             if t_type == "Интервальная":
-                # Логика интервала (can_do и time_text уже должны быть посчитаны выше в коде)
                 if can_do:
                     if btn_col.button("✅ Готово!", key=f"t_{i}", disabled=not is_my, use_container_width=True):
                         db["balances"].loc[0, current_user] += int(row['reward'])
