@@ -525,7 +525,7 @@ elif st.session_state.page == "profile":
         "boss": boss_unlocked,
         "templates": templates_unlocked,
         "bazar": bazar_unlocked,
-        "stakhanov": stakhanov_unlocked
+        "stakhanov": stakhanov_unlocked,
         "teamwork": teamwork_unlocked,  
         "consumer": consumer_unlocked,  
         "habit": habit_unlocked         
