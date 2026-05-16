@@ -91,7 +91,7 @@ if st.session_state.page == "tasks":
         unit = ""
         
         # Магия тут: показываем настройки интервала ТОЛЬКО если тумблер на "Интервальная"
-       if t_type == "Интервальная":
+        if t_type == "Интервальная":
             raw_last_done = row.get('last_completed')
             val = int(row.get('interval_value', 0))
             unit = row.get('interval_unit', 'Часы')
