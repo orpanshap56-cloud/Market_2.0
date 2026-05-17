@@ -193,10 +193,6 @@ if "market" in db and not db["market"].empty:
 # 🔥 СЧИТАЕМ ЦИФРУ ДЛЯ КНОПКИ САЙДБАРА
 new_notif_count = sum(1 for n in active_notifications if n["id"] not in st.session_state.seen_notifications)
 
-
-# --- СТАНДАРТНЫЙ САЙДБАР ---
-with st.sidebar:
-
 # --- СТАНДАРТНЫЙ САЙДБАР ---
 with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
