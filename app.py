@@ -144,8 +144,10 @@ with st.sidebar:
         st.session_state.page = "profile"
         st.rerun()
 
-    if st.button("🔔 Уведомления", use_container_width=True): 
-        st.session_state.page = "notifications"; st.rerun()
+    btn_label = f"🔔 Уведомления ({new_notif_count})" if new_notif_count > 0 else "🔔 Уведомления"
+    if st.button(btn_label, use_container_width=True): 
+        st.session_state.page = "notifications"
+        st.rerun()
         
     st.markdown("---")
     if st.button("🔄 Синхронизировать", use_container_width=True): 
@@ -840,18 +842,19 @@ elif st.session_state.page == "profile":
 # ==========================================
 elif st.session_state.page == "notifications":
     st.title("🔔 Твои уведомления")
-    now = datetime.now()
+    now_dt = datetime.now()
     
-    has_notifications = False # Флаг, чтобы знать, пуста ли страница
+    # Инициализируем хранилище прочитанных уведомлений в сессии
+    if "seen_notifications" not in st.session_state:
+        st.session_state.seen_notifications = set()
+        
+    active_notifications = []
     
-    # 1. НОВЫЕ ДОСТИЖЕНИЯ (Берем 3 последних из истории)
+    # 1. НОВЫЕ ДОСТИЖЕНИЯ
     if "achievements" in db and not db["achievements"].empty:
         my_achs = db["achievements"][db["achievements"]['user'] == current_user]
         if not my_achs.empty:
-            st.subheader("🏆 Последние достижения")
-            
-            # --- СЛОВАРЬ ПЕРЕВОДА АЧИВОК ---
-            # Допиши сюда остальные свои системные ключи и то, как они должны красиво называться
+            # Твой расширенный словарь
             ach_names = {
                 "scrupulous": "Скрупулезный 🧹",
                 "bazar": "Базарный магнат 🛍️",
@@ -860,74 +863,100 @@ elif st.session_state.page == "notifications":
                 "teamwork": "Командная работа",
                 "consumer": "🍪 Потребитель",
                 "habit": "🔁 Дело привычки"
-                
             }
-            
-            # Показываем 3 самых свежих
             for _, ach in my_achs.tail(3).iterrows():
                 raw_ach = ach['achievement']
-                # Ищем красивое имя. Если забыл добавить в словарь — выведет системное, чтобы ты заметил
-                display_ach = ach_names.get(raw_ach, raw_ach) 
-                
-                st.success(f"**Получено достижение:** {display_ach}")
-                has_notifications = True
+                display_ach = ach_names.get(raw_ach, raw_ach)
+                active_notifications.append({
+                    "id": f"ach_{raw_ach}",
+                    "type": "success",
+                    "text": f"🏆 **Получено достижение:** {display_ach}"
+                })
 
-    # 2. ПОРУЧЕННЫЕ ЗАДАНИЯ (Созданы другим юзером для тебя или для "Оба")
-    assigned_tasks = db["tasks"][
-        (db["tasks"]["created_by"] != current_user) & 
-        (db["tasks"]["created_by"] != "Система") &
-        (db["tasks"]["assigned_to"].isin([current_user, "Оба"]))
-    ]
-    if not assigned_tasks.empty:
-        st.subheader("👈 Тебе поручили задачи")
+    # 2. ПОРУЧЕННЫЕ ЗАДАНИЯ
+    if "tasks" in db and not db["tasks"].empty:
+        assigned_tasks = db["tasks"][
+            (db["tasks"]["created_by"] != current_user) & 
+            (db["tasks"]["created_by"] != "Система") &
+            (db["tasks"]["assigned_to"].isin([current_user, "Оба"]))
+        ]
         for _, row in assigned_tasks.iterrows():
             creator = DISPLAY.get(row['created_by'], row['created_by'])
-            st.info(f"**{creator}** оставил(а) задачу: **{row['title']}** (+{row['reward']} 🪙)")
-            has_notifications = True
+            active_notifications.append({
+                "id": f"task_{row['title']}",
+                "type": "info",
+                "text": f"👈 **{creator}** оставил(а) задачу: **{row['title']}** (+{row['reward']} 🪙)"
+            })
 
     # 3. ИНТЕРВАЛЬНЫЕ ЗАДАЧИ, ВЫШЕДШИЕ ИЗ КУЛДАУНА
-    ready_interval_tasks = []
-    for _, row in db["tasks"].iterrows():
-        if row.get('task_type') == "Интервальная" and row['assigned_to'] in [current_user, "Оба"]:
-            raw_last_done = row.get('last_completed')
-            if pd.notna(raw_last_done) and str(raw_last_done).strip() not in ["", "nan"]:
-                try:
-                    last_done_dt = pd.to_datetime(str(raw_last_done))
-                    if last_done_dt.tzinfo is not None:
-                        last_done_dt = last_done_dt.tz_localize(None)
-                    
-                    val = int(row.get('interval_value', 0))
-                    unit = row.get('interval_unit', 'Часы')
-                    offset = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
-                    next_available = last_done_dt + offset
-                    
-                    # Если время пришло — добавляем в список
-                    if now >= next_available:
-                        ready_interval_tasks.append(row)
-                except:
-                    pass
+    if "tasks" in db and not db["tasks"].empty:
+        for _, row in db["tasks"].iterrows():
+            if row.get('task_type') == "Интервальная" and row['assigned_to'] in [current_user, "Оба"]:
+                raw_last_done = row.get('last_completed')
+                if pd.notna(raw_last_done) and str(raw_last_done).strip() not in ["", "nan"]:
+                    try:
+                        last_done_dt = pd.to_datetime(str(raw_last_done))
+                        if last_done_dt.tzinfo is not None:
+                            last_done_dt = last_done_dt.tz_localize(None)
+                        
+                        val = int(row.get('interval_value', 0))
+                        unit = row.get('interval_unit', 'Часы')
+                        offset = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
+                        next_available = last_done_dt + offset
+                        
+                        if now_dt >= next_available:
+                            active_notifications.append({
+                                "id": f"cooldown_{row['title']}",
+                                "type": "warning",
+                                "text": f"⏳ Снова доступно к выполнению: **{row['title']}** (+{row['reward']} 🪙)"
+                            })
+                    except:
+                        pass
 
-    if ready_interval_tasks:
-        st.subheader("⏳ Пора за дело (Кулдаун прошел)")
-        for task in ready_interval_tasks:
-            st.warning(f"Снова доступно к выполнению: **{task['title']}** (+{task['reward']} 🪙)")
-            has_notifications = True
-
-    # 4. ДОСТУПНЫЕ ПОКУПКИ (Накоплено монет на лоты партнера)
-    affordable_lots = db["market"][
-        (db["market"]["seller"] != current_user) & 
-        (db["market"]["type"] != "Общий") & 
-        (db["market"]["price"] <= my_balance)
-    ]
-    if not affordable_lots.empty:
-        st.subheader("🛍️ Хватает монет на покупку!")
+    # 4. ДОСТУПНЫЕ ПОКУПКИ (Накоплено монет на лоты)
+    if "market" in db and not db["market"].empty:
+        affordable_lots = db["market"][
+            (db["market"]["seller"] != current_user) & 
+            (db["market"]["type"] != "Общий") & 
+            (db["market"]["price"] <= my_balance)
+        ]
         for _, lot in affordable_lots.iterrows():
-            st.balloons() # Опционально: можно убрать, если будет бесить
-            st.success(f"Вы накопили на **{lot['title']}** (Цена: {lot['price']} 🪙)!")
-            has_notifications = True
+            active_notifications.append({
+                "id": f"lot_{lot['title']}",
+                "type": "success_lot",
+                "text": f"🛍️ Вы накопили на **{lot['title']}** (Цена: {lot['price']} 🪙)!"
+            })
 
-    # Если вообще ничего нет
-    if not has_notifications:
-        st.write("Тишина и покой! Новых уведомлений пока нет. 🍃")
+    # --- ОТРИСОВКА УВЕДОМЛЕНИЙ ---
+    if not active_notifications:
+        st.info("Тишина и покой! Новых уведомлений пока нет. 🍃")
+    else:
+        # Фильтруем на основе сессии
+        new_items = [n for n in active_notifications if n["id"] not in st.session_state.seen_notifications]
+        read_items = [n for n in active_notifications if n["id"] in st.session_state.seen_notifications]
         
+        # 1. Показываем новые (цветные)
+        if new_items:
+            st.subheader("🆕 Новые")
+            for n in new_items:
+                if n["type"] in ["success", "success_lot"]:
+                    st.success(n["text"])
+                    if n["type"] == "success_lot": 
+                        st.balloons() # Оставил твои шарики для радости покупок
+                elif n["type"] == "info":
+                    st.info(n["text"])
+                elif n["type"] == "warning":
+                    st.warning(n["text"])
+        
+        # 2. Показываем старые (серые)
+        if read_items:
+            st.subheader("📜 Прочитанные")
+            for n in read_items:
+                # Используем HTML, чтобы текст был блеклым
+                st.markdown(f"🔘 <span style='color: #9cb0a9;'>{n['text']}</span>", unsafe_allow_html=True)
+        
+        # Записываем все показанные новые уведомления в "прочитанные"
+        for n in new_items:
+            st.session_state.seen_notifications.add(n["id"])
+
     st.markdown("---")
