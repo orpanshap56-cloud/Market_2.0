@@ -849,9 +849,27 @@ elif st.session_state.page == "notifications":
         my_achs = db["achievements"][db["achievements"]['user'] == current_user]
         if not my_achs.empty:
             st.subheader("🏆 Последние достижения")
+            
+            # --- СЛОВАРЬ ПЕРЕВОДА АЧИВОК ---
+            # Допиши сюда остальные свои системные ключи и то, как они должны красиво называться
+            ach_names = {
+                "scrupulous": "Скрупулезный 🧹",
+                "bazar": "Базарный магнат 🛍️",
+                "boss": "Босс качалки 💪",
+                "templates": "Шаблонное мышление",
+                "teamwork": "Командная работа",
+                "consumer": "🍪 Потребитель",
+                "habit": "🔁 Дело привычки"
+                
+            }
+            
             # Показываем 3 самых свежих
             for _, ach in my_achs.tail(3).iterrows():
-                st.success(f"**Получено достижение:** {ach['achievement']}")
+                raw_ach = ach['achievement']
+                # Ищем красивое имя. Если забыл добавить в словарь — выведет системное, чтобы ты заметил
+                display_ach = ach_names.get(raw_ach, raw_ach) 
+                
+                st.success(f"**Получено достижение:** {display_ach}")
                 has_notifications = True
 
     # 2. ПОРУЧЕННЫЕ ЗАДАНИЯ (Созданы другим юзером для тебя или для "Оба")
