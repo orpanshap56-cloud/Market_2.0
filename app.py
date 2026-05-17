@@ -30,19 +30,30 @@ def send_telegram(text, target="Оба"):
 
 #-----Уровни--------
 def get_level_data(xp):
- level = 1
- next_level_step = 100 # Сколько нужно опыта для перехода с 1 на 2
- total_needed = 100 # Порог для достижения 2 уровня
- 
- while xp >= total_needed:
-  level += 1
-  next_level_step = int(next_level_step * 1.3)
-  total_needed += next_level_step
- 
- # Расчет прогресса внутри уровня
- current_level_start = total_needed - next_level_step
- xp_in_level = xp - current_level_start
- return level, xp_in_level, next_level_step
+    level = 1
+    next_level_step = 100 # Сколько нужно опыта для перехода с 1 на 2
+    total_needed = 100 # Порог для достижения 2 уровня
+    
+    while xp >= total_needed:
+        level += 1
+        next_level_step = int(next_level_step * 1.3)
+        total_needed += next_level_step
+    
+    # Расчет прогресса внутри уровня
+    current_level_start = total_needed - next_level_step
+    current_xp = xp - current_level_start
+    
+    # 1. Высчитываем прогресс (от 0.0 до 1.0) для виджета st.progress
+    progress = current_xp / next_level_step
+    # Страховка, чтобы прогресс случайно не вышел за рамки (Streamlit этого не любит)
+    progress = max(0.0, min(progress, 1.0))
+    
+    # 2. Достаем титул из словаря
+    # .get() хорош тем, что если ключа нет (например, 11 уровень), он не выдаст ошибку, а подставит дефолт
+    lvl_title = LEVEL_TITLES.get(level, "Безымянный герой")
+    
+    # Теперь возвращаем ровно 5 переменных, как ты и просишь на 210 строке
+    return level, progress, current_xp, next_level_step, lvl_title
 
 # Словарь для будущих статусов (пока просто заглушка)
 LEVEL_TITLES = {
