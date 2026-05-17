@@ -228,7 +228,7 @@ with st.sidebar:
         st.session_state.page = "profile"
         st.rerun()
 
-    # 🔥 Вот она, железобетонная кнопка с рабочим счетчиком!
+    # 🔥 Железобетонный вариант через обычный if/else (без однострочников)
     if new_notif_count > 0:
         btn_label = f"🔔 Уведомления ({new_notif_count})"
     else:
@@ -250,7 +250,6 @@ with st.sidebar:
     if st.button("🚪 Выйти из аккаунта", use_container_width=True):
         st.session_state.user = None
         st.rerun()
-
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
 # ==========================================
