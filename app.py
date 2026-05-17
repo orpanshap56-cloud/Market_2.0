@@ -145,9 +145,9 @@ with st.sidebar:
         st.rerun()
 
     btn_label = f"🔔 Уведомления ({new_notif_count})" 
-    if new_notif_count > 0 
+     if new_notif_count > 0 
         else "🔔 Уведомления"
-    if st.button(btn_label, use_container_width=True): 
+     if st.button(btn_label, use_container_width=True): 
         st.session_state.page = "notifications"
         st.rerun()
         
