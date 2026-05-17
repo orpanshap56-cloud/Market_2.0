@@ -114,10 +114,14 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
+current_user = st.session_state.user
+my_balance = int(db["balances"].loc[0, current_user])
+my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
+now = datetime.now()
+
 # ==========================================
-# ГЛОБАЛЬНЫЙ ПРОСЧЕТ УВЕДОМЛЕНИЙ (ДО САЙДБРА)
+# ГЛОБАЛЬНЫЙ ПРОСЧЕТ УВЕДОМЛЕНИЙ
 # ==========================================
-# Чтобы счетчик работал везде, нам нужны эти таблицы на всех страницах:
 load_sheets("tasks", "market", "achievements")
 
 if "seen_notifications" not in st.session_state:
@@ -157,10 +161,10 @@ if "tasks" in db and not db["tasks"].empty:
         creator = DISPLAY.get(row['created_by'], row['created_by'])
         active_notifications.append({
             "id": f"task_{row['title']}", "type": "info",
-            "text": f"👈 **{creator}** оставил(а) задачу: **{row['title']}** (+{row['reward']} 🪙)"
+            "text": f"👈 **{creator}** поручил(а) тебе задачу: **{row['title']}** (+{row['reward']} 🪙)"
         })
 
-    # 3. Кулдаун
+    # 3. Кулдаун интервальных задач
     for _, row in db["tasks"].iterrows():
         if row.get('task_type') == "Интервальная" and row['assigned_to'] in [current_user, "Оба"]:
             raw_last_done = row.get('last_completed')
@@ -190,68 +194,68 @@ if "market" in db and not db["market"].empty:
             "text": f"🛍️ Вы накопили на **{lot['title']}** (Цена: {lot['price']} 🪙)!"
         })
 
-# 🔥 СЧИТАЕМ ЦИФРУ ДЛЯ КНОПКИ САЙДБАРА
+# Считаем количество НОВЫХ уведомлений
 new_notif_count = sum(1 for n in active_notifications if n["id"] not in st.session_state.seen_notifications)
 
-# --- СТАНДАРТНЫЙ САЙДБАР ---
+
+# ==========================================
+# ЧИСТЫЙ И ПРАВИЛЬНЫЙ САЙДБАР
+# ==========================================
 with st.sidebar:
-    st.title(f"{DISPLAY[current_user]}")
-    st.metric("Кошелек", f"{my_balance} 🪙")
+    st.header(f"👋 Привет, {DISPLAY[current_user]}!")
     
-    # 🔥 СИСТЕМА УРОВНЕЙ
-    lvl, xp_current, xp_needed = get_level_data(my_rating)
-    title = LEVEL_TITLES.get(lvl, "Герой")
-    
-    st.markdown(f"### Уровень {lvl}: **{title}**")
-    # Прогресс-бар
-    progress = xp_current / xp_needed
-    st.progress(progress)
-    st.caption(f"Опыт: {xp_current} / {xp_needed} (Всего: {my_rating} 💖)")
-    
+    # Виджет баланса
+    with st.container(border=True):
+        st.markdown(f"<h2 style='text-align: center; margin:0;'>{my_balance} 🪙</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: gray; margin:0;'>Ваш баланс</p>", unsafe_allow_html=True)
+        
     st.markdown("---")
     
-    # Навигация
-    if st.button("📋 Список задач", use_container_width=True):
+    # Виджет уровня
+    lvl, progress, current_xp, next_xp, lvl_title = get_level_data(my_rating)
+    st.markdown(f"🏅 **Уровень {lvl}: {lvl_title}**")
+    st.progress(progress)
+    st.caption(f"Опыт рейтинга: {current_xp} / {next_xp} 💖")
+    
+    st.markdown("---")
+    st.subheader("🗺️ Навигация")
+    
+    # Кнопки страниц
+    if st.button("📋 Список заданий", use_container_width=True):
         st.session_state.page = "tasks"
         st.rerun()
-            
+        
     if st.button("🛒 Маркетплейс", use_container_width=True):
         st.session_state.page = "market"
         st.rerun()
-            
+        
     if st.button("👤 Личный кабинет", use_container_width=True):
         st.session_state.page = "profile"
         st.rerun()
 
-    btn_label = (
-    f"🔔 Уведомления ({new_notif_count})" 
-    if new_notif_count > 0 
-    else "🔔 Уведомления"
-)
+    # 🔥 Динамическая кнопка Уведомлений ВНУТРИ сайдбара
+    btn_label = f"🔔 Уведомления ({new_notif_count})" if new_notif_count > 0 else "🔔 Уведомления"
+    if st.button(btn_label, use_container_width=True):
+        st.session_state.page = "notifications"
+        st.rerun()
 
-if st.button(btn_label, use_container_width=True): 
-    st.session_state.page = "notifications"
-    st.rerun()
-        
     st.markdown("---")
-    if st.button("🔄 Синхронизировать", use_container_width=True): 
-        sync_database()
+    
+    # Кнопка ручной синхронизации
+    if st.button("🔄 Синхронизация", use_container_width=True):
+        st.cache_data.clear()
+        st.toast("Данные успешно обновлены из Google Sheets!")
+        st.rerun()
         
-    if st.button("🚪 Выйти", use_container_width=True):
+    # Кнопка выхода
+    if st.button("🚪 Выйти из аккаунта", use_container_width=True):
         st.session_state.user = None
         st.rerun()
 
-# --- 2. ДОГРУЗКА ДАННЫХ ДЛЯ ТЕКУЩЕЙ СТРАНИЦЫ ---
+# ==========================================
+# ЛОГИКА ЭКРАНОВ (ДАЛЬШЕ ТВОЙ КОД)
+# ==========================================
 if st.session_state.page == "tasks":
-    load_sheets("tasks", "templates", "history")
-
-elif st.session_state.page == "market":
-    load_sheets("market", "history")
-
-elif st.session_state.page == "profile":
-    # Для профиля нужно почти всё, чтобы посчитать ачивки и отчеты
-    load_sheets("tasks", "market", "history", "templates", "reports", "achievements")
-
         
 # ==========================================
 # ГЛАВНАЯ СТРАНИЦА (ЗАДАЧИ)
