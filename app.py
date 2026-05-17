@@ -114,14 +114,12 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
-current_user = st.session_state.user
-my_balance = int(db["balances"].loc[0, current_user])
-my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
-now = datetime.now()
-
 # ==========================================
 # ГЛОБАЛЬНЫЙ ПРОСЧЕТ УВЕДОМЛЕНИЙ
 # ==========================================
+# 🔥 ВОТ ОНО! Возвращаем подгрузку баз, иначе мы ничего не посчитаем!
+load_sheets("tasks", "market", "achievements")
+
 if "seen_notifications" not in st.session_state:
     st.session_state.seen_notifications = set()
 
@@ -229,9 +227,9 @@ with st.sidebar:
         
     if st.button("👤 Личный кабинет", use_container_width=True):
         st.session_state.page = "profile"
-        st.rerun() # <-- Проверь, чтобы эти скобки точно были закрыты!
+        st.rerun()
 
-    # 🔥 Железобетонный вариант через обычный if/else (без однострочников)
+    # 🔥 Вот она, железобетонная кнопка с рабочим счетчиком!
     if new_notif_count > 0:
         btn_label = f"🔔 Уведомления ({new_notif_count})"
     else:
@@ -240,6 +238,7 @@ with st.sidebar:
     if st.button(btn_label, use_container_width=True):
         st.session_state.page = "notifications"
         st.rerun()
+        
     st.markdown("---")
     
     # Кнопка ручной синхронизации
