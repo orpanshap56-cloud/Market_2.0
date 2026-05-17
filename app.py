@@ -529,7 +529,7 @@ elif st.session_state.page == "market":
                             db["balances"].loc[0, partner_key] += price
                         
                         current_time = now.strftime("%d.%m.%Y %H:%M")
-                        new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка"}])
+                        new_log = pd.DataFrame([{"date": current_time, "buyer": current_user, "item": row['title'], "price": price, "seller": row['seller'], "type": "Покупка", "status": "Ожидает"}])
                         db["history"] = pd.concat([db["history"], new_log], ignore_index=True)
                         
                         # Удаляем купленный лот
@@ -754,15 +754,57 @@ elif st.session_state.page == "profile":
     else:
         st.write("Вы еще ничего не выставили на продажу.")
 
+   # --- ИСТОРИЯ ПОКУПОК С КНОПКОЙ СТАТУСА ---
     st.subheader("🛍️ История моих покупок")
     my_buys = db["history"][(db["history"]['buyer'] == current_user) & (db["history"]['type'] == 'Покупка')]
+
     if not my_buys.empty:
-        if 'date' in my_buys.columns:
-            st.dataframe(my_buys[['date', 'item', 'price', 'seller']], use_container_width=True, hide_index=True)
-        else:
-            st.dataframe(my_buys[['item', 'price', 'seller']], use_container_width=True, hide_index=True)
+        for idx, row in my_buys.iterrows():
+            # Безопасно проверяем статус. Если пустой — значит это старая запись, ставим "Ожидает"
+            status = row.get("status", "Ожидает")
+            if pd.isna(status) or str(status).strip() in ["", "nan", "None"]:
+                status = "Ожидает"
+                
+            price = int(row['price'])
+            seller = row['seller']
+            seller_label = DISPLAY.get(seller, seller)
+            
+            with st.container(border=True):
+                c1, c2 = st.columns([3, 1.3], vertical_alignment="center")
+                
+                if status == "Выполнено":
+                    c1.write(f"✅ ~~{row['item']}~~ ({price} 🪙) — Исполнитель: *{seller_label}*")
+                    c2.button("Выполнено", key=f"done_buy_{idx}", disabled=True, use_container_width=True)
+                else:
+                    c1.write(f"⏳ **{row['item']}** ({price} 🪙) — Исполнитель: *{seller_label}*")
+                    
+                    # Кнопка активна только если продавец — конкретный человек (Муж/Жена), а не "Общак"
+                    if seller in ["Муж", "Жена"]:
+                        if c2.button("Выполнено", key=f"done_buy_{idx}", use_container_width=True):
+                            # Считаем 25% опыта от стоимости лота
+                            xp_reward = int(price * 0.25)
+                            
+                            # Начисляем опыт исполнителю (продавцу лота)
+                            partner_rating_key = f"{seller}_Рейтинг"
+                            db["balances"].loc[0, partner_rating_key] += xp_reward
+                            
+                            # Проверяем/создаем колонку status в основной истории и меняем значение
+                            if "status" not in db["history"].columns:
+                                db["history"]["status"] = "Ожидает"
+                            
+                            db["history"].at[idx, "status"] = "Выполнено"
+                            
+                            # Сохраняем всё в Google Sheets
+                            save_data("balances", db["balances"])
+                            save_data("history", db["history"])
+                            
+                            st.success(f"🎉 {seller_label} получает +{xp_reward} 💖 опыта за выполнение!")
+                            st.rerun()
+                    else:
+                        # Заглушка для общих целей (где продавец "Общак")
+                        c2.button("Цель закрыта", key=f"done_buy_{idx}", disabled=True, use_container_width=True)
     else:
-        st.write("Пока пусто.")
+        st.write("Вы еще ничего не купили.")
     
     st.subheader("💖 За что получен рейтинг")
     my_sales = db["history"][(db["history"]['seller'] == current_user) & (db["history"]['type'] == 'Покупка')]
