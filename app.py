@@ -114,6 +114,89 @@ my_balance = int(db["balances"].loc[0, current_user])
 my_rating = int(db["balances"].loc[0, f"{current_user}_Рейтинг"])
 now = datetime.now()
 
+# ==========================================
+# ГЛОБАЛЬНЫЙ ПРОСЧЕТ УВЕДОМЛЕНИЙ (ДО САЙДБРА)
+# ==========================================
+# Чтобы счетчик работал везде, нам нужны эти таблицы на всех страницах:
+load_sheets("tasks", "market", "achievements")
+
+if "seen_notifications" not in st.session_state:
+    st.session_state.seen_notifications = set()
+
+active_notifications = []
+
+# 1. Достижения
+if "achievements" in db and not db["achievements"].empty:
+    my_achs = db["achievements"][db["achievements"]['user'] == current_user]
+    if not my_achs.empty:
+        ach_names = {
+            "scrupulous": "Скрупулезный 🧹",
+            "bazar": "Базарный магнат 🛍️",
+            "boss": "Босс качалки 💪",
+            "templates": "Шаблонное мышление",
+            "teamwork": "Командная работа",
+            "consumer": "🍪 Потребитель",
+            "habit": "🔁 Дело привычки"
+        }
+        for _, ach in my_achs.tail(3).iterrows():
+            raw_ach = ach['achievement']
+            display_ach = ach_names.get(raw_ach, raw_ach)
+            active_notifications.append({
+                "id": f"ach_{raw_ach}", "type": "success",
+                "text": f"🏆 **Получено достижение:** {display_ach}"
+            })
+
+# 2. Порученные задания
+if "tasks" in db and not db["tasks"].empty:
+    assigned_tasks = db["tasks"][
+        (db["tasks"]["created_by"] != current_user) & 
+        (db["tasks"]["created_by"] != "Система") &
+        (db["tasks"]["assigned_to"].isin([current_user, "Оба"]))
+    ]
+    for _, row in assigned_tasks.iterrows():
+        creator = DISPLAY.get(row['created_by'], row['created_by'])
+        active_notifications.append({
+            "id": f"task_{row['title']}", "type": "info",
+            "text": f"👈 **{creator}** оставил(а) задачу: **{row['title']}** (+{row['reward']} 🪙)"
+        })
+
+    # 3. Кулдаун
+    for _, row in db["tasks"].iterrows():
+        if row.get('task_type') == "Интервальная" and row['assigned_to'] in [current_user, "Оба"]:
+            raw_last_done = row.get('last_completed')
+            if pd.notna(raw_last_done) and str(raw_last_done).strip() not in ["", "nan"]:
+                try:
+                    last_done_dt = pd.to_datetime(str(raw_last_done)).tz_localize(None)
+                    val = int(row.get('interval_value', 0))
+                    unit = row.get('interval_unit', 'Часы')
+                    offset = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
+                    if now >= (last_done_dt + offset):
+                        active_notifications.append({
+                            "id": f"cooldown_{row['title']}", "type": "warning",
+                            "text": f"⏳ Снова доступно: **{row['title']}** (+{row['reward']} 🪙)"
+                        })
+                except: pass
+
+# 4. Доступные по деньгам лоты
+if "market" in db and not db["market"].empty:
+    affordable_lots = db["market"][
+        (db["market"]["seller"] != current_user) & 
+        (db["market"]["type"] != "Общий") & 
+        (db["market"]["price"] <= my_balance)
+    ]
+    for _, lot in affordable_lots.iterrows():
+        active_notifications.append({
+            "id": f"lot_{lot['title']}", "type": "success_lot",
+            "text": f"🛍️ Вы накопили на **{lot['title']}** (Цена: {lot['price']} 🪙)!"
+        })
+
+# 🔥 СЧИТАЕМ ЦИФРУ ДЛЯ КНОПКИ САЙДБАРА
+new_notif_count = sum(1 for n in active_notifications if n["id"] not in st.session_state.seen_notifications)
+
+
+# --- СТАНДАРТНЫЙ САЙДБАР ---
+with st.sidebar:
+
 # --- СТАНДАРТНЫЙ САЙДБАР ---
 with st.sidebar:
     st.title(f"{DISPLAY[current_user]}")
