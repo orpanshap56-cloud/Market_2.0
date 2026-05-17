@@ -122,8 +122,6 @@ now = datetime.now()
 # ==========================================
 # ГЛОБАЛЬНЫЙ ПРОСЧЕТ УВЕДОМЛЕНИЙ
 # ==========================================
-load_sheets("tasks", "market", "achievements")
-
 if "seen_notifications" not in st.session_state:
     st.session_state.seen_notifications = set()
 
