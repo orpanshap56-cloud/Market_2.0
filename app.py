@@ -143,6 +143,9 @@ with st.sidebar:
     if st.button("👤 Личный кабинет", use_container_width=True):
         st.session_state.page = "profile"
         st.rerun()
+
+    if st.button("🔔 Уведомления", use_container_width=True): 
+        st.session_state.page = "notifications"; st.rerun()
         
     st.markdown("---")
     if st.button("🔄 Синхронизировать", use_container_width=True): 
@@ -831,3 +834,82 @@ elif st.session_state.page == "profile":
         st.dataframe(display_tasks, use_container_width=True, hide_index=True)
     else:
         st.write("Пока пусто.")
+
+# ==========================================
+# ЭКРАН 4: УВЕДОМЛЕНИЯ
+# ==========================================
+elif st.session_state.page == "notifications":
+    st.title("🔔 Твои уведомления")
+    now = datetime.now()
+    
+    has_notifications = False # Флаг, чтобы знать, пуста ли страница
+    
+    # 1. НОВЫЕ ДОСТИЖЕНИЯ (Берем 3 последних из истории)
+    if "achievements" in db and not db["achievements"].empty:
+        my_achs = db["achievements"][db["achievements"]['user'] == current_user]
+        if not my_achs.empty:
+            st.subheader("🏆 Последние достижения")
+            # Показываем 3 самых свежих
+            for _, ach in my_achs.tail(3).iterrows():
+                st.success(f"**Получено достижение:** {ach['achievement']}")
+                has_notifications = True
+
+    # 2. ПОРУЧЕННЫЕ ЗАДАНИЯ (Созданы другим юзером для тебя или для "Оба")
+    assigned_tasks = db["tasks"][
+        (db["tasks"]["created_by"] != current_user) & 
+        (db["tasks"]["created_by"] != "Система") &
+        (db["tasks"]["assigned_to"].isin([current_user, "Оба"]))
+    ]
+    if not assigned_tasks.empty:
+        st.subheader("👈 Тебе поручили задачи")
+        for _, row in assigned_tasks.iterrows():
+            creator = DISPLAY.get(row['created_by'], row['created_by'])
+            st.info(f"**{creator}** оставил(а) задачу: **{row['title']}** (+{row['reward']} 🪙)")
+            has_notifications = True
+
+    # 3. ИНТЕРВАЛЬНЫЕ ЗАДАЧИ, ВЫШЕДШИЕ ИЗ КУЛДАУНА
+    ready_interval_tasks = []
+    for _, row in db["tasks"].iterrows():
+        if row.get('task_type') == "Интервальная" and row['assigned_to'] in [current_user, "Оба"]:
+            raw_last_done = row.get('last_completed')
+            if pd.notna(raw_last_done) and str(raw_last_done).strip() not in ["", "nan"]:
+                try:
+                    last_done_dt = pd.to_datetime(str(raw_last_done))
+                    if last_done_dt.tzinfo is not None:
+                        last_done_dt = last_done_dt.tz_localize(None)
+                    
+                    val = int(row.get('interval_value', 0))
+                    unit = row.get('interval_unit', 'Часы')
+                    offset = timedelta(hours=val) if unit == "Часы" else timedelta(days=val)
+                    next_available = last_done_dt + offset
+                    
+                    # Если время пришло — добавляем в список
+                    if now >= next_available:
+                        ready_interval_tasks.append(row)
+                except:
+                    pass
+
+    if ready_interval_tasks:
+        st.subheader("⏳ Пора за дело (Кулдаун прошел)")
+        for task in ready_interval_tasks:
+            st.warning(f"Снова доступно к выполнению: **{task['title']}** (+{task['reward']} 🪙)")
+            has_notifications = True
+
+    # 4. ДОСТУПНЫЕ ПОКУПКИ (Накоплено монет на лоты партнера)
+    affordable_lots = db["market"][
+        (db["market"]["seller"] != current_user) & 
+        (db["market"]["type"] != "Общий") & 
+        (db["market"]["price"] <= my_balance)
+    ]
+    if not affordable_lots.empty:
+        st.subheader("🛍️ Хватает монет на покупку!")
+        for _, lot in affordable_lots.iterrows():
+            st.balloons() # Опционально: можно убрать, если будет бесить
+            st.success(f"Вы накопили на **{lot['title']}** (Цена: {lot['price']} 🪙)!")
+            has_notifications = True
+
+    # Если вообще ничего нет
+    if not has_notifications:
+        st.write("Тишина и покой! Новых уведомлений пока нет. 🍃")
+        
+    st.markdown("---")
