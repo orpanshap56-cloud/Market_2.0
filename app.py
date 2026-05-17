@@ -391,15 +391,14 @@ if st.session_state.page == "tasks":
 elif st.session_state.page == "market":
     st.title("🛒 Маркетплейс")
 
-     # --- ФОРМА СОЗДАНИЯ ЛОТА (МОДАЛЬНОЕ ОКНО) ---
+    # --- ФОРМА СОЗДАНИЯ ЛОТА (МОДАЛЬНОЕ ОКНО) ---
     @st.dialog("🏷️ Выставить лот на продажу")
     def add_market_modal():
         m_title = st.text_input("Что продаем / На что копим?")
         m_price = st.number_input("Цена или Цель (🪙)", min_value=1, value=50)
         m_type = st.selectbox("Тип лота", ["Индивидуальный", "Общий"])
-        m_seller = st.selectbox("Кто предоставляет?", [current_user, "Оба"], format_func=lambda x: DISPLAY.get(x, x))
+        m_seller = st.selectbox("Кто предоставляет?", ["Муж", "Жена", "Оба"], format_func=lambda x: DISPLAY.get(x, x))
         
-        # Заменили st.form_submit_button на обычную кнопку, так как внутри окна форма уже не нужна
         if st.button("Выставить на маркет", use_container_width=True):
             if m_title.strip():
                 new_item = {
@@ -420,7 +419,6 @@ elif st.session_state.page == "market":
                 save_data("market", db["market"])
                 save_data("history", db["history"])
                 
-                # st.rerun() мгновенно закроет окно, очистит поля и обновит витрину
                 st.rerun()
             else:
                 st.warning("Введите название лота!")
@@ -449,10 +447,8 @@ elif st.session_state.page == "market":
 
     # Логика фильтрации
     if m_filter == "Доступные для покупки":
-        # Показываем то, что выставил партнер или Общие цели
         df_m = df_m[df_m["seller"] != current_user]
     elif m_filter == "Мои лоты на витрине":
-        # Показываем только свои лоты (включая "Оба", так как ты совладелец)
         df_m = df_m[df_m["seller"].isin([current_user, "Оба"])]
 
     # Сбрасываем индекс для корректной работы кнопок
@@ -470,11 +466,11 @@ elif st.session_state.page == "market":
             
             # Карточка лота
             with st.container(border=True):
-                c1, c2, c3 = st.columns([3, 1.2, 0.5])
+                # Немного расширил центральную колонку под длинные названия кнопок с ценой
+                c1, c2, c3 = st.columns([3, 1.3, 0.5])
                 
                 # Кнопка удаления
                 if c3.button("🗑️", key=f"del_m_{j}"):
-                    # Удаляем по заголовку из основной базы
                     db["market"] = db["market"][db["market"]["title"] != row["title"]]
                     save_data("market", db["market"])
                     st.rerun()
@@ -493,7 +489,7 @@ elif st.session_state.page == "market":
                         donate_amount = c2.number_input("Сумма", min_value=1, max_value=max(1, price - collected), value=min(10, price - collected), key=f"don_val_{j}")
                         if c2.button("Скинуться", key=f"don_btn_{j}", disabled=(my_balance < donate_amount), use_container_width=True):
                             db["balances"].loc[0, current_user] -= donate_amount
-                            # Находим лот в основной базе и обновляем
+                            
                             idx_in_db = db["market"][db["market"]["title"] == row["title"]].index[0]
                             db["market"].at[idx_in_db, 'collected'] = collected + donate_amount
                             
@@ -519,9 +515,11 @@ elif st.session_state.page == "market":
                     # --- ЛОГИКА ИНДИВИДУАЛЬНОГО ЛОТА ---
                     is_my_item = (row['seller'] == current_user)
                     can_buy = (not is_my_item) and (my_balance >= price)
-                    btn_label = "Мой лот" if is_my_item else f"Купить"
                     
-                    c1.write(f"🎁 **{row['title']}** ({price} 🪙)")
+                    # 🔥 Цена переехала внутрь текста кнопки! В заголовке больше нет скобок.
+                    btn_label = f"Мой лот ({price} 🪙)" if is_my_item else f"Купить за {price} 🪙"
+                    
+                    c1.write(f"🎁 **{row['title']}**")
                     if is_my_item: c1.caption("*(Ваше на витрине)*")
                     
                     if c2.button(btn_label, key=f"m_{j}", disabled=not can_buy, use_container_width=True):
